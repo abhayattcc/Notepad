@@ -1,0 +1,1 @@
+fully offline handwritten notepad
