@@ -899,7 +899,7 @@
                 try {
                     currentPdf = null;
                     pdfPageCount = 0;
-                    canvasPages = [document.createElement('canvas')];
+                    canvasPages = [];
                     currentPageIndex = 0;
                     undoStack = [];
                     redoStack = [];
@@ -968,6 +968,11 @@
                         }
                         canvasPages = Array(pdfPageCount).fill().map(() => document.createElement('canvas'));
                         progressBarContainer.classList.add('hidden');
+                        isLocked = true; // Open in lock mode by default
+                        document.getElementById('lockButton').classList.add('active');
+                        document.getElementById('content').classList.add('locked');
+                        document.getElementById('drawingCanvas').classList.add('locked');
+                        document.getElementById('overlayCanvas').classList.add('locked');
                         showSection('drawing');
                         renderPage(1);
                     }
@@ -1267,10 +1272,9 @@
                 const newCanvas = document.createElement('canvas');
                 newCanvas.width = content.offsetWidth;
                 newCanvas.height = content.offsetHeight;
-                canvasPages.push(newCanvas);
-                currentPageIndex = canvasPages.length - 1;
-                currentPdf = null;
-                pdfPageCount = 0;
+                // Insert new blank page after the current page
+                canvasPages.splice(currentPageIndex + 1, 0, newCanvas);
+                currentPageIndex = currentPageIndex + 1;
                 const selector = document.getElementById('pageSelector');
                 selector.innerHTML = '';
                 for (let i = 1; i <= canvasPages.length; i++) {
@@ -1279,7 +1283,7 @@
                     option.text = `Page ${i}`;
                     selector.appendChild(option);
                 }
-                selector.value = canvasPages.length;
+                selector.value = currentPageIndex + 1;
                 undoStack = [];
                 redoStack = [];
                 overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
@@ -1309,7 +1313,7 @@
                     const ctx = currentCanvas.getContext('2d');
                     const imageData = ctx.getImageData(0, 0, currentCanvas.width, currentCanvas.height).data;
                     const isEmpty = Array.from(imageData).every(pixel => pixel === 0 || pixel === 255);
-                    if (isEmpty && canvasPages.length > 1) {
+                    if (isEmpty && canvasPages.length > 1 && currentPageIndex >= pdfPageCount) {
                         canvasPages.splice(currentPageIndex, 1);
                         deleteFromStore('canvasPages', `canvasPage_${currentPageIndex}`)
                             .then(() => {
