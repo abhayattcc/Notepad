@@ -252,10 +252,29 @@
         margin-top: 5px;
         color: #333;
     }
+.refresh-button {
+        background: #2196f3;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 25px;
+        font-size: 18px;
+        cursor: pointer;
+        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+        transition: transform 0.3s;
+        border: none;
+        margin: 20px auto;
+        display: block;
+    }
+    .refresh-button:hover {
+        transform: scale(1.1);
+        background: #1976d2;
+    }
     </style>
 </head>
 <body>
 <div class="container">
+<button class="refresh-button" id="refreshButton">🔄 Refresh</button>
+<div>
     <div class="tabs" id="tabs">
         <div class="tab active" onclick="toggleSection('text')">📝 Write</div>
         <div class="tab" onclick="toggleSection('drawing')">🎨 Draw</div>
@@ -1602,6 +1621,9 @@
 
     overlayCanvas.addEventListener('wheel', (e) => {
         if (!isLocked) e.preventDefault();
+    });
+document.getElementById('refreshButton').addEventListener('click', () => {
+        window.location.reload();
     });
 
     // Window resize handling
