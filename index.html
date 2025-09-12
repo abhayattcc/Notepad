@@ -5,270 +5,271 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0,user-scalable=yes">
     <title>Kids Notepad</title>
     <style>
-    * {
-        box-sizing: border-box;
-    }
-    body {
-        margin: 0;
-        padding: 0;
-        font-family: 'Comic Sans MS', 'Arial', sans-serif;
-        background-color: #f0f8ff;
-        display: flex;
-        flex-direction: column;
-        height: 100vh;
-        width: 100vw;
-        overflow: hidden;
-    }
-    .container {
-        display: flex;
-        flex-direction: column;
-        height: 100vh;
-        width: 100vw;
-        position: relative;
-    }
-    .tabs {
-        display: flex;
-        background-color: #ff69b4;
-        padding: 10px;
-        width: 100%;
-        z-index: 2;
-        position: sticky;
-        top: 0;
-    }
-    .tab {
-        flex: 1;
-        text-align: center;
-        padding: 12px;
-        color: white;
-        cursor: pointer;
-        font-size: 20px;
-        border-radius: 8px;
-        margin: 0 5px;
-        background-color: #ff1493;
-        transition: background-color 0.3s;
-    }
-    .tab.active {
-        background-color: #c71585;
-    }
-    .tab:hover {
-        background-color: #db7093;
-    }
-    .toolbar {
-        display: flex;
-        flex-wrap: wrap;
-        background-color: #fffacd;
-        padding: 10px;
-        border-bottom: 2px solid #ffd700;
-        gap: 8px;
-        width: 100%;
-        justify-content: center;
-        z-index: 2;
-    }
-    .toolbar-group {
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
-        justify-content: center;
-    }
-    .toolbar button {
-        background-color: #7fffd4;
-        border: 2px solid #20b2aa;
-        border-radius: 8px;
-        padding: 8px;
-        font-size: 28px;
-        cursor: pointer;
-        width: 56px;
-        height: 56px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: background-color 0.3s;
-    }
-    .toolbar button:hover {
-        background-color: #40e0d0;
-    }
-    .toolbar button.active {
-        background-color: #20b2aa;
-    }
-    .content {
-        flex: 1;
-        padding: 10px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        width: 100%;
-        overflow: auto;
-        position: relative;
-    }
-    .content.fullscreen {
-        padding: 10px;
-        width: 100%;
-        height: calc(100vh - 60px);
-        overflow: auto;
-    }
-    .content.locked {
-        overflow: auto;
-    }
-    #textEditor, #savedTextList {
-        width: 100%;
-        height: 100%;
-        border-radius: 8px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-        border: none;
-        resize: none;
-        font-size: 16px;
-        padding: 10px;
-        white-space: pre-wrap;
-        background: white;
-        background-size: 100% 30px;
-        line-height: 30px;
-        outline: none;
-        overflow-y: auto;
-        scroll-behavior: smooth;
-        scrollbar-width: auto;
-        scrollbar-color: #20b2aa #f0f8ff;
-        user-select: text;
-    }
-    #textEditor::-webkit-scrollbar, #savedTextList::-webkit-scrollbar {
-        width: 16px;
-    }
-    #textEditor::-webkit-scrollbar-track, #savedTextList::-webkit-scrollbar-track {
-        background: #f0f8ff;
-        border-radius: 8px;
-    }
-    #textEditor::-webkit-scrollbar-thumb, #savedTextList::-webkit-scrollbar-thumb {
-        background-color: #20b2aa;
-        border-radius: 8px;
-        border: 2px solid #f0f8ff;
-        min-height: 60px;
-    }
-    #drawingCanvas, #overlayCanvas {
-        touch-action: auto;
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        height: 100%;
-        width: 100%;
-        transition: opacity 0.5s ease-out;
-    }
-    #drawingCanvas.locked, #overlayCanvas.locked {
-        touch-action: auto;
-    }
-    #overlayCanvas {
-        background: transparent;
-        z-index: 1;
-    }
-    .pen-options {
-        display: flex;
-        gap: 8px;
-        margin-top: 8px;
-    }
-    .pen-options select {
-        padding: 8px;
-        font-size: 14px;
-        border-radius: 8px;
-        border: 2px solid #20b2aa;
-        background-color: #f0fff0;
-    }
-    .hidden {
-        display: none;
-    }
-    #savedTextList {
-        overflow-y: auto;
-        padding: 10px;
-    }
-    .saved-text-item {
-        padding: 10px;
-        border-bottom: 2px solid #ffd700;
-        cursor: pointer;
-        font-size: 16px;
-        background-color: #f0fff0;
-        border-radius: 8px;
-        margin-bottom: 5px;
-    }
-    .saved-text-item:hover {
-        background-color: #e6e6fa;
-    }
-    .page-controls {
-        display: flex;
-        gap: 8px;
-        margin-top: 8px;
-    }
-    .page-controls select, .page-controls button {
-        padding: 8px;
-        font-size: 14px;
-        border-radius: 8px;
-        border: 2px solid #20b2aa;
-        background-color: #f0fff0;
-        cursor: pointer;
-    }
-    .back-button, .view-trash-button {
-        position: absolute;
-        padding: 8px;
-        font-size: 14px;
-        border-radius: 8px;
-        border: 2px solid #20b2aa;
-        background-color: #f0fff0;
-        cursor: pointer;
-    }
-    .back-button {
-        top: 10px;
-        left: 10px;
-    }
-    .view-trash-button {
-        top: 10px;
-        right: 10px;
-    }
-    #progressBarContainer {
-        position: absolute;
-        top: 50%;
-        left: 50%;
-        transform: translate(-50%, -50%);
-        width: 80%;
-        max-width: 400px;
-        background-color: #fffacd;
-        border: 2px solid #ffd700;
-        border-radius: 8px;
-        padding: 10px;
-        display: none;
-        z-index: 1000;
-    }
-    #progressBar {
-        width: 100%;
-        height: 20px;
-        background-color: #7fffd4;
-        border-radius: 4px;
-        overflow: hidden;
-    }
-    #progressFill {
-        height: 100%;
-        background-color: #20b2aa;
-        width: 0%;
-        transition: width 0.2s ease-in-out;
-    }
-    #progressText {
-        text-align: center;
-        font-size: 14px;
-        margin-top: 5px;
-        color: #333;
-    }
+* {
+    box-sizing: border-box;
+}
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Comic Sans MS', 'Arial', sans-serif;
+    background-color: #f0f8ff;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+}
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    width: 100vw;
+    position: relative;
+}
+.tabs {
+    display: flex;
+    background-color: #ff69b4;
+    padding: 10px;
+    width: 100%;
+    z-index: 2;
+    position: sticky;
+    top: 0;
+}
+.tab {
+    flex: 1;
+    text-align: center;
+    padding: 12px;
+    color: white;
+    cursor: pointer;
+    font-size: 20px;
+    border-radius: 8px;
+    margin: 0 5px;
+    background-color: #ff1493;
+    transition: background-color 0.3s;
+}
+.tab.active {
+    background-color: #c71585;
+}
+.tab:hover {
+    background-color: #db7093;
+}
+.toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    background-color: #fffacd;
+    padding: 10px;
+    border-bottom: 2px solid #ffd700;
+    gap: 8px;
+    width: 100%;
+    justify-content: center;
+    z-index: 2;
+}
+.toolbar-group {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+.toolbar button {
+    background-color: #7fffd4;
+    border: 2px solid #20b2aa;
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 28px;
+    cursor: pointer;
+    width: 56px;
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.3s;
+}
+.toolbar button:hover {
+    background-color: #40e0d0;
+}
+.toolbar button.active {
+    background-color: #20b2aa;
+}
+.content {
+    flex: 1;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100vh;
+    overflow: auto;
+    position: relative;
+}
+.content.fullscreen {
+    padding: 0;
+    width: 100%;
+    height: 100vh;
+    overflow: auto;
+}
+.content.locked {
+    overflow: auto;
+}
+#textEditor, #savedTextList {
+    width: 100%;
+    height: 100vh;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    border: none;
+    resize: none;
+    font-size: 16px;
+    padding: 10px;
+    white-space: pre-wrap;
+    background: white;
+    background-size: 100% 30px;
+    line-height: 30px;
+    outline: none;
+    overflow-y: auto;
+    scroll-behavior: smooth;
+    scrollbar-width: auto;
+    scrollbar-color: #20b2aa #f0f8ff;
+    user-select: text;
+}
+#textEditor::-webkit-scrollbar, #savedTextList::-webkit-scrollbar {
+    width: 16px;
+}
+#textEditor::-webkit-scrollbar-track, #savedTextList::-webkit-scrollbar-track {
+    background: #f0f8ff;
+    border-radius: 8px;
+}
+#textEditor::-webkit-scrollbar-thumb, #savedTextList::-webkit-scrollbar-thumb {
+    background-color: #20b2aa;
+    border-radius: 8px;
+    border: 2px solid #f0f8ff;
+    min-height: 60px;
+}
+#drawingCanvas, #overlayCanvas {
+    touch-action: auto;
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    width: 100%;
+    transition: opacity 0.5s ease-out;
+}
+#drawingCanvas.locked, #overlayCanvas.locked {
+    touch-action: auto;
+}
+#overlayCanvas {
+    background: transparent;
+    z-index: 1;
+}
+.pen-options {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+.pen-options select {
+    padding: 8px;
+    font-size: 14px;
+    border-radius: 8px;
+    border: 2px solid #20b2aa;
+    background-color: #f0fff0;
+}
+.hidden {
+    display: none;
+}
+#savedTextList {
+    overflow-y: auto;
+    padding: 10px;
+}
+.saved-text-item {
+    padding: 10px;
+    border-bottom: 2px solid #ffd700;
+    cursor: pointer;
+    font-size: 16px;
+    background-color: #f0fff0;
+    border-radius: 8px;
+    margin-bottom: 5px;
+}
+.saved-text-item:hover {
+    background-color: #e6e6fa;
+}
+.page-controls {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+.page-controls select, .page-controls button {
+    padding: 8px;
+    font-size: 14px;
+    border-radius: 8px;
+    border: 2px solid #20b2aa;
+    background-color: #f0fff0;
+    cursor: pointer;
+}
+.back-button, .view-trash-button {
+    position: absolute;
+    padding: 8px;
+    font-size: 14px;
+    border-radius: 8px;
+    border: 2px solid #20b2aa;
+    background-color: #f0fff0;
+    cursor: pointer;
+}
+.back-button {
+    top: 10px;
+    left: 10px;
+}
+.view-trash-button {
+    top: 10px;
+    right: 10px;
+}
+#progressBarContainer {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    max-width: 400px;
+    background-color: #fffacd;
+    border: 2px solid #ffd700;
+    border-radius: 8px;
+    padding: 10px;
+    display: none;
+    z-index: 1000;
+}
+#progressBar {
+    width: 100%;
+    height: 20px;
+    background-color: #7fffd4;
+    border-radius: 4px;
+    overflow: hidden;
+}
+#progressFill {
+    height: 100%;
+    background-color: #20b2aa;
+    width: 0%;
+    transition: width 0.2s ease-in-out;
+}
+#progressText {
+    text-align: center;
+    font-size: 14px;
+    margin-top: 5px;
+    color: #333;
+}
 .refresh-button {
-        background: #2196f3;
-        color: white;
-        padding: 10px 20px;
-        border-radius: 25px;
-        font-size: 18px;
-        cursor: pointer;
-        box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
-        transition: transform 0.3s;
-        border: none;
-        margin: 20px auto;
-        display: block;
-    }
-    .refresh-button:hover {
-        transform: scale(1.1);
-        background: #1976d2;
-    }
+    background: #2196f3;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 25px;
+    font-size: 18px;
+    cursor: pointer;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.3);
+    transition: transform 0.3s;
+    border: none;
+    margin: 20px auto;
+    display: block;
+}
+.refresh-button:hover {
+    transform: scale(1.1);
+    background: #1976d2;
+}
     </style>
 </head>
 <body>
