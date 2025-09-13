@@ -305,6 +305,7 @@ body {
 <div class="container">
     <div class="header">
         <button class="refresh-button" id="refreshButton">🔄 Refresh</button>
+        <a href="https://abhayattcc.github.io/Abhayattcc/" class="button">🏠 Home</a>
         <div class="tabs" id="tabs">
             <div class="tab active" onclick="toggleSection('text')">📝 Write</div>
             <div class="tab" onclick="toggleSection('drawing')">🎨 Draw</div>
@@ -381,7 +382,7 @@ body {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
-    // Inline Service Worker Registration
+        // Inline Service Worker Registration
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             const swCode = `
@@ -1070,36 +1071,40 @@ body {
     async function renderPage(pageNum) {
         currentPageIndex = pageNum - 1;
         const content = document.querySelector('.content');
-        let imgWidth = content.offsetWidth;
-        let imgHeight = content.offsetHeight;
+        const dpr = window.devicePixelRatio || 1;
+        const cssWidth = content.offsetWidth;
+        const cssHeight = content.offsetHeight;
+        const width = cssWidth * dpr;
+        const height = cssHeight * dpr;
+
+        canvas.style.width = `${cssWidth}px`;
+        canvas.style.height = `${cssHeight}px`;
+        overlayCanvas.style.width = `${cssWidth}px`;
+        overlayCanvas.style.height = `${cssHeight}px`;
+        canvas.width = width;
+        canvas.height = height;
+        overlayCanvas.width = width;
+        overlayCanvas.height = height;
+
+        let pageCanvas = canvasPages[currentPageIndex];
+        pageCanvas.width = width;
+        pageCanvas.height = height;
+        const pageCtx = pageCanvas.getContext('2d', { willReadFrequently: true });
 
         if (currentPdf && currentPageIndex < pdfPageCount) {
             const page = await currentPdf.getPage(pageNum);
-            const viewport = page.getViewport({ scale: 3 });
-            imgWidth = viewport.width;
-            imgHeight = viewport.height;
-            canvasPages[currentPageIndex].width = imgWidth;
-            canvasPages[currentPageIndex].height = imgHeight;
-            const ctx = canvasPages[currentPageIndex].getContext('2d', { willReadFrequently: true });
-            ctx.clearRect(0, 0, imgWidth, imgHeight);
+            const pdfViewport = page.getViewport({ scale: 1 });
+            const scale = (cssWidth / pdfViewport.width) * dpr;
+            const viewport = page.getViewport({ scale });
+            pageCtx.clearRect(0, 0, width, height);
             await page.render({
-                canvasContext: ctx,
+                canvasContext: pageCtx,
                 viewport: viewport,
                 enableWebGL: true
             }).promise;
         } else {
-            canvasPages[currentPageIndex].width = imgWidth;
-            canvasPages[currentPageIndex].height = imgHeight;
-            const ctx = canvasPages[currentPageIndex].getContext('2d', { willReadFrequently: true });
-            ctx.clearRect(0, 0, imgWidth, imgHeight);
+            pageCtx.clearRect(0, 0, width, height);
         }
-
-        canvas.width = imgWidth;
-        canvas.height = imgHeight;
-        overlayCanvas.width = content.offsetWidth;
-        overlayCanvas.height = content.offsetHeight;
-        canvasPages[currentPageIndex].width = canvas.width;
-        canvasPages[currentPageIndex].height = canvas.height;
 
         try {
             const transaction = db.transaction(['canvasPages'], 'readonly');
@@ -1111,27 +1116,27 @@ body {
                     const img = new Image();
                     img.src = savedCanvas.dataURL;
                     img.onload = () => {
-                        overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+                        overlayContext.clearRect(0, 0, width, height);
                         overlayContext.drawImage(img, 0, 0);
                         redrawCanvas();
                     };
                     img.onerror = () => {
-                        overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+                        overlayContext.clearRect(0, 0, width, height);
                         redrawCanvas();
                     };
                 } else {
-                    overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+                    overlayContext.clearRect(0, 0, width, height);
                     redrawCanvas();
                 }
             };
             request.onerror = () => {
                 console.error('Failed to load canvas page:', request.error);
-                overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+                overlayContext.clearRect(0, 0, width, height);
                 redrawCanvas();
             };
         } catch (err) {
             console.error('Failed to load canvas page:', err);
-            overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+            overlayContext.clearRect(0, 0, width, height);
             redrawCanvas();
         }
     }
@@ -1164,7 +1169,7 @@ body {
 
         if (currentPdf && currentPageIndex < pdfPageCount) {
             const page = await currentPdf.getPage(currentPageIndex + 1);
-            const viewport = page.getViewport({ scale: 3 });
+            const viewport = page.getViewport({ scale: (document.querySelector('.content').offsetWidth / page.getViewport({scale:1}).width) * (window.devicePixelRatio || 1) });
             tempCanvas.width = viewport.width;
             tempCanvas.height = viewport.height;
             await page.render({
@@ -1209,7 +1214,9 @@ body {
 
             if (currentPdf && i < pdfPageCount) {
                 const page = await currentPdf.getPage(i + 1);
-                const viewport = page.getViewport({ scale: 3 });
+                const pdfViewport = page.getViewport({scale:1});
+                const scale = (document.querySelector('.content').offsetWidth / pdfViewport.width) * (window.devicePixelRatio || 1);
+                const viewport = page.getViewport({scale});
                 tempCanvas.width = viewport.width;
                 tempCanvas.height = viewport.height;
                 await page.render({
@@ -1268,21 +1275,24 @@ body {
     // Canvas Drawing
     function resizeCanvas() {
         const content = document.querySelector('.content');
-        let imgWidth = content.offsetWidth;
-        let imgHeight = content.offsetHeight;
+        const dpr = window.devicePixelRatio || 1;
+        const cssWidth = content.offsetWidth;
+        const cssHeight = content.offsetHeight;
+        const width = cssWidth * dpr;
+        const height = cssHeight * dpr;
 
-        if (currentPdf && currentPageIndex < pdfPageCount) {
-            imgWidth = canvasPages[currentPageIndex].width || imgWidth;
-            imgHeight = canvasPages[currentPageIndex].height || imgHeight;
-        }
+        canvas.style.width = `${cssWidth}px`;
+        canvas.style.height = `${cssHeight}px`;
+        overlayCanvas.style.width = `${cssWidth}px`;
+        overlayCanvas.style.height = `${cssHeight}px`;
+        canvas.width = width;
+        canvas.height = height;
+        overlayCanvas.width = width;
+        overlayCanvas.height = height;
 
-        canvas.width = imgWidth;
-        canvas.height = imgHeight;
-        overlayCanvas.width = content.offsetWidth;
-        overlayCanvas.height = content.offsetHeight;
-        canvasPages[currentPageIndex].width = canvas.width;
-        canvasPages[currentPageIndex].height = canvas.height;
-        canvasPages[currentPageIndex].getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+        canvasPages[currentPageIndex].width = width;
+        canvasPages[currentPageIndex].height = height;
+        canvasPages[currentPageIndex].getContext('2d').clearRect(0, 0, width, height);
         try {
             const transaction = db.transaction(['canvasPages'], 'readonly');
             const store = transaction.objectStore('canvasPages');
@@ -1293,23 +1303,23 @@ body {
                     const img = new Image();
                     img.src = savedCanvas.dataURL;
                     img.onload = () => {
-                        overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+                        overlayContext.clearRect(0, 0, width, height);
                         overlayContext.drawImage(img, 0, 0);
                         redrawCanvas();
                     };
                 } else {
-                    overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+                    overlayContext.clearRect(0, 0, width, height);
                     redrawCanvas();
                 }
             };
             request.onerror = () => {
                 console.error('Failed to load canvas page:', request.error);
-                overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+                overlayContext.clearRect(0, 0, width, height);
                 redrawCanvas();
             };
         } catch (err) {
             console.error('Failed to load canvas page:', err);
-            overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+            overlayContext.clearRect(0, 0, width, height);
             redrawCanvas();
         }
     }
@@ -1319,9 +1329,10 @@ body {
         const dataURL = overlayCanvas.toDataURL();
         putToStore('canvasPages', { id: `canvasPage_${currentPageIndex}`, dataURL })
             .then(() => {
+                const dpr = window.devicePixelRatio || 1;
                 const newCanvas = document.createElement('canvas');
-                newCanvas.width = content.offsetWidth;
-                newCanvas.height = content.offsetHeight;
+                newCanvas.width = content.offsetWidth * dpr;
+                newCanvas.height = content.offsetHeight * dpr;
                 // Insert new blank page after the current page
                 canvasPages.splice(currentPageIndex + 1, 0, newCanvas);
                 currentPageIndex = currentPageIndex + 1;
@@ -1484,27 +1495,20 @@ body {
     async function redrawCanvas() {
         if (canvas.width === 0 || canvas.height === 0) return;
         canvasContext.clearRect(0, 0, canvas.width, canvas.height);
-        if (currentPdf && currentPageIndex < pdfPageCount) {
-            const page = await currentPdf.getPage(currentPageIndex + 1);
-            const viewport = page.getViewport({ scale: 3 });
-            await page.render({
-                canvasContext: canvasContext,
-                viewport: viewport,
-                enableWebGL: true
-            }).promise;
-        }
+        canvasContext.drawImage(canvasPages[currentPageIndex], 0, 0);
     }
 
     // Simplified Smooth Drawing Logic
     function getCoordinates(e) {
         const rect = overlayCanvas.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
         let x, y;
         if (e.type.startsWith('touch')) {
-            x = e.touches[0].clientX - rect.left;
-            y = e.touches[0].clientY - rect.top;
+            x = (e.touches[0].clientX - rect.left) * dpr;
+            y = (e.touches[0].clientY - rect.top) * dpr;
         } else {
-            x = e.clientX - rect.left;
-            y = e.clientY - rect.top;
+            x = (e.clientX - rect.left) * dpr;
+            y = (e.clientY - rect.top) * dpr;
         }
         return { x, y, time: Date.now() };
     }
@@ -1512,29 +1516,22 @@ body {
     function drawStroke(currentPoint) {
         if (!lastPoint) return;
 
+        const dpr = window.devicePixelRatio || 1;
         overlayContext.lineCap = 'round';
         overlayContext.lineJoin = 'round';
         overlayContext.strokeStyle = penColor;
-        overlayContext.lineWidth = penWidth;
-        overlayContext.globalAlpha = 100;
-
-        const deltaTime = currentPoint.time - lastTime;
-        const speed = Math.sqrt(
-            Math.pow(currentPoint.x - lastPoint.x, 1) +
-            Math.pow(currentPoint.y - lastPoint.y, 1)
-        ) / (deltaTime || 1);
-        const dynamicWidth = Math.max(1, Math.min(penWidth, penWidth / (1 + speed * 0.1)));
+        overlayContext.lineWidth = penWidth * dpr;
+        overlayContext.globalAlpha = 1;
 
         overlayContext.beginPath();
         overlayContext.moveTo(lastPoint.x, lastPoint.y);
         overlayContext.lineTo(currentPoint.x, currentPoint.y);
-        overlayContext.lineWidth = dynamicWidth;
         overlayContext.stroke();
-        overlayContext.globalAlpha = 100;
     }
 
     function eraseStroke(x, y) {
-        const eraseRadius = penWidth * 5;
+        const dpr = window.devicePixelRatio || 1;
+        const eraseRadius = penWidth * 5 * dpr;
         overlayContext.globalCompositeOperation = 'destination-out';
         overlayContext.beginPath();
         overlayContext.arc(x, y, eraseRadius, 0, Math.PI * 2);
