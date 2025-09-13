@@ -5,311 +5,260 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0,user-scalable=yes">
     <title>Kids Notepad</title>
     <style>
-* {
-    box-sizing: border-box;
-}
-body {
-    margin: 0;
-    padding: 0;
-    font-family: 'Comic Sans MS', 'Arial', sans-serif;
-    background-color: #f0f8ff;
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    width: 100vw;
-    overflow: hidden;
-}
-.container {
-    display: flex;
-    flex-direction: column;
-    height: 100vh;
-    width: 100vw;
-    position: relative;
-}
-.header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    background-color: #ff69b4;
-    padding: 10px;
-    width: 100%;
-    z-index: 2;
-    position: sticky;
-    top: 0;
-    justify-content: center;
-}
-.tabs {
-    display: flex;
-    gap: 5px;
-}
-.tab {
-    flex: 1;
-    text-align: center;
-    padding: 12px;
-    color: white;
-    cursor: pointer;
-    font-size: 20px;
-    border-radius: 8px;
-    background-color: #ff1493;
-    transition: background-color 0.3s;
-    min-width: 100px;
-}
-.tab.active {
-    background-color: #c71585;
-}
-.tab:hover {
-    background-color: #db7093;
-}
-.toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    background-color: #fffacd;
-    padding: 10px;
-    border-bottom: 2px solid #ffd700;
-    gap: 8px;
-    width: 100%;
-    justify-content: center;
-    z-index: 2;
-}
-.toolbar-group {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    justify-content: center;
-}
-.toolbar button {
-    background-color: #7fffd4;
-    border: 2px solid #20b2aa;
-    border-radius: 8px;
-    padding: 8px;
-    font-size: 28px;
-    cursor: pointer;
-    width: 56px;
-    height: 56px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: background-color 0.3s;
-}
-.toolbar button:hover {
-    background-color: #40e0d0;
-}
-.toolbar button.active {
-    background-color: #20b2aa;
-}
-.content {
-    flex: 1;
-    padding: 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    width: 100%;
-    height: 100vh;
-    overflow: auto;
-    position: relative;
-}
-.content.fullscreen {
-    padding: 0;
-    width: 100%;
-    height: 100vh;
-    overflow: auto;
-}
-.content.locked {
-    overflow: auto;
-}
-#textEditor, #savedTextList {
-    width: 100%;
-    height: 100vh;
-    border-radius: 8px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-    border: none;
-    resize: none;
-    font-size: 16px;
-    padding: 10px;
-    white-space: pre-wrap;
-    background: white;
-    background-size: 100% 30px;
-    line-height: 30px;
-    outline: none;
-    overflow-y: auto;
-    scroll-behavior: smooth;
-    scrollbar-width: auto;
-    scrollbar-color: #20b2aa #f0f8ff;
-    user-select: text;
-}
-#textEditor::-webkit-scrollbar, #savedTextList::-webkit-scrollbar {
-    width: 16px;
-}
-#textEditor::-webkit-scrollbar-track, #savedTextList::-webkit-scrollbar-track {
-    background: #f0f8ff;
-    border-radius: 8px;
-}
-#textEditor::-webkit-scrollbar-thumb, #savedTextList::-webkit-scrollbar-thumb {
-    background-color: #20b2aa;
-    border-radius: 8px;
-    border: 2px solid #f0f8ff;
-    min-height: 60px;
-}
-#drawingCanvas, #overlayCanvas {
-    touch-action: auto;
-    position: absolute;
-    top: 0;
-    left: 0;
-    height: 100vh;
-    width: 100%;
-    transition: opacity 0.5s ease-out;
-}
-#drawingCanvas.locked, #overlayCanvas.locked {
-    touch-action: auto;
-}
-#overlayCanvas {
-    background: transparent;
-    z-index: 1;
-}
-.pen-options {
-    display: flex;
-    gap: 8px;
-    margin-top: 8px;
-}
-.pen-options select {
-    padding: 8px;
-    font-size: 14px;
-    border-radius: 8px;
-    border: 2px solid #20b2aa;
-    background-color: #f0fff0;
-}
-.hidden {
-    display: none;
-}
-#savedTextList {
-    overflow-y: auto;
-    padding: 10px;
-}
-.saved-text-item {
-    padding: 10px;
-    border-bottom: 2px solid #ffd700;
-    cursor: pointer;
-    font-size: 16px;
-    background-color: #f0fff0;
-    border-radius: 8px;
-    margin-bottom: 5px;
-}
-.saved-text-item:hover {
-    background-color: #e6e6fa;
-}
-.page-controls {
-    display: flex;
-    gap: 8px;
-    margin-top: 8px;
-}
-.page-controls select, .page-controls button {
-    padding: 8px;
-    font-size: 14px;
-    border-radius: 8px;
-    border: 2px solid #20b2aa;
-    background-color: #f0fff0;
-    cursor: pointer;
-}
-.back-button, .view-trash-button {
-    position: absolute;
-    padding: 8px;
-    font-size: 14px;
-    border-radius: 8px;
-    border: 2px solid #20b2aa;
-    background-color: #f0fff0;
-    cursor: pointer;
-}
-.back-button {
-    top: 10px;
-    left: 10px;
-}
-.view-trash-button {
-    top: 10px;
-    right: 10px;
-}
-#progressBarContainer {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    width: 80%;
-    max-width: 400px;
-    background-color: #fffacd;
-    border: 2px solid #ffd700;
-    border-radius: 8px;
-    padding: 10px;
-    display: none;
-    z-index: 1000;
-}
-#progressBar {
-    width: 100%;
-    height: 20px;
-    background-color: #7fffd4;
-    border-radius: 4px;
-    overflow: hidden;
-}
-#progressFill {
-    height: 100%;
-    background-color: #20b2aa;
-    width: 0%;
-    transition: width 0.2s ease-in-out;
-}
-#progressText {
-    text-align: center;
-    font-size: 14px;
-    margin-top: 5px;
-    color: #333;
-}
-.refresh-button {
-    flex: 1;
-    background: #2196f3;
-    color: white;
-    padding: 12px;
-    border-radius: 8px;
-    font-size: 18px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-    border: none;
-    text-align: center;
-    min-width: 100px;
-}
-.refresh-button:hover {
-    background: #1976d2;
-}
-.button {
-    flex: 1;
-    padding: 12px;
-    font-size: 18px;
-    text-decoration: none;
-    color: white;
-    background: linear-gradient(45deg, #ff6b6b, #4ecdc4);
-    border-radius: 8px;
-    cursor: pointer;
-    transition: background-color 0.3s;
-    text-align: center;
-    min-width: 100px;
-}
-.button:hover {
-    background: linear-gradient(45deg, #ff4b4b, #3ab8b0);
-}
-@media (max-width: 600px) {
-    .refresh-button, .button, .tab {
-        padding: 8px;
-        font-size: 16px;
-        min-width: 80px;
+    * {
+        box-sizing: border-box;
     }
-}
-</style>
+    body {
+        margin: 0;
+        padding: 0;
+        font-family: 'Comic Sans MS', 'Arial', sans-serif;
+        background-color: #f0f8ff;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        width: 100vw;
+        overflow: hidden;
+    }
+    .container {
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+        width: 100vw;
+        position: relative;
+    }
+    .tabs {
+        display: flex;
+        background-color: #ff69b4;
+        padding: 10px;
+        width: 100%;
+        z-index: 2;
+        position: sticky;
+        top: 0;
+    }
+    .tab {
+        flex: 1;
+        text-align: center;
+        padding: 12px;
+        color: white;
+        cursor: pointer;
+        font-size: 20px;
+        border-radius: 8px;
+        margin: 0 5px;
+        background-color: #ff1493;
+        transition: background-color 0.3s;
+    }
+    .tab.active {
+        background-color: #c71585;
+    }
+    .tab:hover {
+        background-color: #db7093;
+    }
+    .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        background-color: #fffacd;
+        padding: 10px;
+        border-bottom: 2px solid #ffd700;
+        gap: 8px;
+        width: 100%;
+        justify-content: center;
+        z-index: 2;
+    }
+    .toolbar-group {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    .toolbar button {
+        background-color: #7fffd4;
+        border: 2px solid #20b2aa;
+        border-radius: 8px;
+        padding: 8px;
+        font-size: 28px;
+        cursor: pointer;
+        width: 56px;
+        height: 56px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background-color 0.3s;
+    }
+    .toolbar button:hover {
+        background-color: #40e0d0;
+    }
+    .toolbar button.active {
+        background-color: #20b2aa;
+    }
+    .content {
+        flex: 1;
+        padding: 10px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        width: 100%;
+        overflow: auto;
+        position: relative;
+    }
+    .content.fullscreen {
+        padding: 10px;
+        width: 100%;
+        height: calc(100vh - 60px);
+        overflow: auto;
+    }
+    .content.locked {
+        overflow: auto;
+    }
+    #textEditor, #savedTextList {
+        width: 100%;
+        height: 100%;
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        border: none;
+        resize: none;
+        font-size: 16px;
+        padding: 10px;
+        white-space: pre-wrap;
+        background: white;
+        background-size: 100% 30px;
+        line-height: 30px;
+        outline: none;
+        overflow-y: auto;
+        scroll-behavior: smooth;
+        scrollbar-width: auto;
+        scrollbar-color: #20b2aa #f0f8ff;
+        user-select: text;
+    }
+    #textEditor::-webkit-scrollbar, #savedTextList::-webkit-scrollbar {
+        width: 16px;
+    }
+    #textEditor::-webkit-scrollbar-track, #savedTextList::-webkit-scrollbar-track {
+        background: #f0f8ff;
+        border-radius: 8px;
+    }
+    #textEditor::-webkit-scrollbar-thumb, #savedTextList::-webkit-scrollbar-thumb {
+        background-color: #20b2aa;
+        border-radius: 8px;
+        border: 2px solid #f0f8ff;
+        min-height: 60px;
+    }
+    #drawingCanvas, #overlayCanvas {
+        touch-action: auto;
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        height: 100%;
+        width: 100%;
+        transition: opacity 0.5s ease-out;
+    }
+    #drawingCanvas.locked, #overlayCanvas.locked {
+        touch-action: auto;
+    }
+    #overlayCanvas {
+        background: transparent;
+        z-index: 1;
+    }
+    .pen-options {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+    }
+    .pen-options select {
+        padding: 8px;
+        font-size: 14px;
+        border-radius: 8px;
+        border: 2px solid #20b2aa;
+        background-color: #f0fff0;
+    }
+    .hidden {
+        display: none;
+    }
+    #savedTextList {
+        overflow-y: auto;
+        padding: 10px;
+    }
+    .saved-text-item {
+        padding: 10px;
+        border-bottom: 2px solid #ffd700;
+        cursor: pointer;
+        font-size: 16px;
+        background-color: #f0fff0;
+        border-radius: 8px;
+        margin-bottom: 5px;
+    }
+    .saved-text-item:hover {
+        background-color: #e6e6fa;
+    }
+    .page-controls {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+    }
+    .page-controls select, .page-controls button {
+        padding: 8px;
+        font-size: 14px;
+        border-radius: 8px;
+        border: 2px solid #20b2aa;
+        background-color: #f0fff0;
+        cursor: pointer;
+    }
+    .back-button, .view-trash-button {
+        position: absolute;
+        padding: 8px;
+        font-size: 14px;
+        border-radius: 8px;
+        border: 2px solid #20b2aa;
+        background-color: #f0fff0;
+        cursor: pointer;
+    }
+    .back-button {
+        top: 10px;
+        left: 10px;
+    }
+    .view-trash-button {
+        top: 10px;
+        right: 10px;
+    }
+    #progressBarContainer {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80%;
+        max-width: 400px;
+        background-color: #fffacd;
+        border: 2px solid #ffd700;
+        border-radius: 8px;
+        padding: 10px;
+        display: none;
+        z-index: 1000;
+    }
+    #progressBar {
+        width: 100%;
+        height: 20px;
+        background-color: #7fffd4;
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    #progressFill {
+        height: 100%;
+        background-color: #20b2aa;
+        width: 0%;
+        transition: width 0.2s ease-in-out;
+    }
+    #progressText {
+        text-align: center;
+        font-size: 14px;
+        margin-top: 5px;
+        color: #333;
+    }
+    </style>
 </head>
 <body>
 <div class="container">
-    <div class="header">
-        <button class="refresh-button" id="refreshButton">🔄 Refresh</button>
-        <a href="https://abhayattcc.github.io/Abhayattcc/" class="button">🏠 Home</a>
-        <div class="tabs" id="tabs">
-            <div class="tab active" onclick="toggleSection('text')">📝 Write</div>
-            <div class="tab" onclick="toggleSection('drawing')">🎨 Draw</div>
-        </div>
+    <div class="tabs" id="tabs">
+        <div class="tab active" onclick="toggleSection('text')">📝 Write</div>
+        <div class="tab" onclick="toggleSection('drawing')">🎨 Draw</div>
     </div>
     <div class="toolbar" id="toolbar">
         <div class="toolbar-group" id="textTools">
@@ -382,7 +331,7 @@ body {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
-        // Inline Service Worker Registration
+    // Inline Service Worker Registration
     if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
             const swCode = `
@@ -1071,40 +1020,36 @@ body {
     async function renderPage(pageNum) {
         currentPageIndex = pageNum - 1;
         const content = document.querySelector('.content');
-        const dpr = window.devicePixelRatio || 1;
-        const cssWidth = content.offsetWidth;
-        const cssHeight = content.offsetHeight;
-        const width = cssWidth * dpr;
-        const height = cssHeight * dpr;
-
-        canvas.style.width = `${cssWidth}px`;
-        canvas.style.height = `${cssHeight}px`;
-        overlayCanvas.style.width = `${cssWidth}px`;
-        overlayCanvas.style.height = `${cssHeight}px`;
-        canvas.width = width;
-        canvas.height = height;
-        overlayCanvas.width = width;
-        overlayCanvas.height = height;
-
-        let pageCanvas = canvasPages[currentPageIndex];
-        pageCanvas.width = width;
-        pageCanvas.height = height;
-        const pageCtx = pageCanvas.getContext('2d', { willReadFrequently: true });
+        let imgWidth = content.offsetWidth;
+        let imgHeight = content.offsetHeight;
 
         if (currentPdf && currentPageIndex < pdfPageCount) {
             const page = await currentPdf.getPage(pageNum);
-            const pdfViewport = page.getViewport({ scale: 1 });
-            const scale = (cssWidth / pdfViewport.width) * dpr;
-            const viewport = page.getViewport({ scale });
-            pageCtx.clearRect(0, 0, width, height);
+            const viewport = page.getViewport({ scale: 3 });
+            imgWidth = viewport.width;
+            imgHeight = viewport.height;
+            canvasPages[currentPageIndex].width = imgWidth;
+            canvasPages[currentPageIndex].height = imgHeight;
+            const ctx = canvasPages[currentPageIndex].getContext('2d', { willReadFrequently: true });
+            ctx.clearRect(0, 0, imgWidth, imgHeight);
             await page.render({
-                canvasContext: pageCtx,
+                canvasContext: ctx,
                 viewport: viewport,
                 enableWebGL: true
             }).promise;
         } else {
-            pageCtx.clearRect(0, 0, width, height);
+            canvasPages[currentPageIndex].width = imgWidth;
+            canvasPages[currentPageIndex].height = imgHeight;
+            const ctx = canvasPages[currentPageIndex].getContext('2d', { willReadFrequently: true });
+            ctx.clearRect(0, 0, imgWidth, imgHeight);
         }
+
+        canvas.width = imgWidth;
+        canvas.height = imgHeight;
+        overlayCanvas.width = content.offsetWidth;
+        overlayCanvas.height = content.offsetHeight;
+        canvasPages[currentPageIndex].width = canvas.width;
+        canvasPages[currentPageIndex].height = canvas.height;
 
         try {
             const transaction = db.transaction(['canvasPages'], 'readonly');
@@ -1116,27 +1061,27 @@ body {
                     const img = new Image();
                     img.src = savedCanvas.dataURL;
                     img.onload = () => {
-                        overlayContext.clearRect(0, 0, width, height);
+                        overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
                         overlayContext.drawImage(img, 0, 0);
                         redrawCanvas();
                     };
                     img.onerror = () => {
-                        overlayContext.clearRect(0, 0, width, height);
+                        overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
                         redrawCanvas();
                     };
                 } else {
-                    overlayContext.clearRect(0, 0, width, height);
+                    overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
                     redrawCanvas();
                 }
             };
             request.onerror = () => {
                 console.error('Failed to load canvas page:', request.error);
-                overlayContext.clearRect(0, 0, width, height);
+                overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
                 redrawCanvas();
             };
         } catch (err) {
             console.error('Failed to load canvas page:', err);
-            overlayContext.clearRect(0, 0, width, height);
+            overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
             redrawCanvas();
         }
     }
@@ -1169,7 +1114,7 @@ body {
 
         if (currentPdf && currentPageIndex < pdfPageCount) {
             const page = await currentPdf.getPage(currentPageIndex + 1);
-            const viewport = page.getViewport({ scale: (document.querySelector('.content').offsetWidth / page.getViewport({scale:1}).width) * (window.devicePixelRatio || 1) });
+            const viewport = page.getViewport({ scale: 3 });
             tempCanvas.width = viewport.width;
             tempCanvas.height = viewport.height;
             await page.render({
@@ -1214,9 +1159,7 @@ body {
 
             if (currentPdf && i < pdfPageCount) {
                 const page = await currentPdf.getPage(i + 1);
-                const pdfViewport = page.getViewport({scale:1});
-                const scale = (document.querySelector('.content').offsetWidth / pdfViewport.width) * (window.devicePixelRatio || 1);
-                const viewport = page.getViewport({scale});
+                const viewport = page.getViewport({ scale: 3 });
                 tempCanvas.width = viewport.width;
                 tempCanvas.height = viewport.height;
                 await page.render({
@@ -1275,24 +1218,21 @@ body {
     // Canvas Drawing
     function resizeCanvas() {
         const content = document.querySelector('.content');
-        const dpr = window.devicePixelRatio || 1;
-        const cssWidth = content.offsetWidth;
-        const cssHeight = content.offsetHeight;
-        const width = cssWidth * dpr;
-        const height = cssHeight * dpr;
+        let imgWidth = content.offsetWidth;
+        let imgHeight = content.offsetHeight;
 
-        canvas.style.width = `${cssWidth}px`;
-        canvas.style.height = `${cssHeight}px`;
-        overlayCanvas.style.width = `${cssWidth}px`;
-        overlayCanvas.style.height = `${cssHeight}px`;
-        canvas.width = width;
-        canvas.height = height;
-        overlayCanvas.width = width;
-        overlayCanvas.height = height;
+        if (currentPdf && currentPageIndex < pdfPageCount) {
+            imgWidth = canvasPages[currentPageIndex].width || imgWidth;
+            imgHeight = canvasPages[currentPageIndex].height || imgHeight;
+        }
 
-        canvasPages[currentPageIndex].width = width;
-        canvasPages[currentPageIndex].height = height;
-        canvasPages[currentPageIndex].getContext('2d').clearRect(0, 0, width, height);
+        canvas.width = imgWidth;
+        canvas.height = imgHeight;
+        overlayCanvas.width = content.offsetWidth;
+        overlayCanvas.height = content.offsetHeight;
+        canvasPages[currentPageIndex].width = canvas.width;
+        canvasPages[currentPageIndex].height = canvas.height;
+        canvasPages[currentPageIndex].getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
         try {
             const transaction = db.transaction(['canvasPages'], 'readonly');
             const store = transaction.objectStore('canvasPages');
@@ -1303,23 +1243,23 @@ body {
                     const img = new Image();
                     img.src = savedCanvas.dataURL;
                     img.onload = () => {
-                        overlayContext.clearRect(0, 0, width, height);
+                        overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
                         overlayContext.drawImage(img, 0, 0);
                         redrawCanvas();
                     };
                 } else {
-                    overlayContext.clearRect(0, 0, width, height);
+                    overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
                     redrawCanvas();
                 }
             };
             request.onerror = () => {
                 console.error('Failed to load canvas page:', request.error);
-                overlayContext.clearRect(0, 0, width, height);
+                overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
                 redrawCanvas();
             };
         } catch (err) {
             console.error('Failed to load canvas page:', err);
-            overlayContext.clearRect(0, 0, width, height);
+            overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
             redrawCanvas();
         }
     }
@@ -1329,10 +1269,9 @@ body {
         const dataURL = overlayCanvas.toDataURL();
         putToStore('canvasPages', { id: `canvasPage_${currentPageIndex}`, dataURL })
             .then(() => {
-                const dpr = window.devicePixelRatio || 1;
                 const newCanvas = document.createElement('canvas');
-                newCanvas.width = content.offsetWidth * dpr;
-                newCanvas.height = content.offsetHeight * dpr;
+                newCanvas.width = content.offsetWidth;
+                newCanvas.height = content.offsetHeight;
                 // Insert new blank page after the current page
                 canvasPages.splice(currentPageIndex + 1, 0, newCanvas);
                 currentPageIndex = currentPageIndex + 1;
@@ -1495,20 +1434,27 @@ body {
     async function redrawCanvas() {
         if (canvas.width === 0 || canvas.height === 0) return;
         canvasContext.clearRect(0, 0, canvas.width, canvas.height);
-        canvasContext.drawImage(canvasPages[currentPageIndex], 0, 0);
+        if (currentPdf && currentPageIndex < pdfPageCount) {
+            const page = await currentPdf.getPage(currentPageIndex + 1);
+            const viewport = page.getViewport({ scale: 3 });
+            await page.render({
+                canvasContext: canvasContext,
+                viewport: viewport,
+                enableWebGL: true
+            }).promise;
+        }
     }
 
     // Simplified Smooth Drawing Logic
     function getCoordinates(e) {
         const rect = overlayCanvas.getBoundingClientRect();
-        const dpr = window.devicePixelRatio || 1;
         let x, y;
         if (e.type.startsWith('touch')) {
-            x = (e.touches[0].clientX - rect.left) * dpr;
-            y = (e.touches[0].clientY - rect.top) * dpr;
+            x = e.touches[0].clientX - rect.left;
+            y = e.touches[0].clientY - rect.top;
         } else {
-            x = (e.clientX - rect.left) * dpr;
-            y = (e.clientY - rect.top) * dpr;
+            x = e.clientX - rect.left;
+            y = e.clientY - rect.top;
         }
         return { x, y, time: Date.now() };
     }
@@ -1516,22 +1462,29 @@ body {
     function drawStroke(currentPoint) {
         if (!lastPoint) return;
 
-        const dpr = window.devicePixelRatio || 1;
         overlayContext.lineCap = 'round';
         overlayContext.lineJoin = 'round';
         overlayContext.strokeStyle = penColor;
-        overlayContext.lineWidth = penWidth * dpr;
-        overlayContext.globalAlpha = 1;
+        overlayContext.lineWidth = penWidth;
+        overlayContext.globalAlpha = 100;
+
+        const deltaTime = currentPoint.time - lastTime;
+        const speed = Math.sqrt(
+            Math.pow(currentPoint.x - lastPoint.x, 1) +
+            Math.pow(currentPoint.y - lastPoint.y, 1)
+        ) / (deltaTime || 1);
+        const dynamicWidth = Math.max(1, Math.min(penWidth, penWidth / (1 + speed * 0.1)));
 
         overlayContext.beginPath();
         overlayContext.moveTo(lastPoint.x, lastPoint.y);
         overlayContext.lineTo(currentPoint.x, currentPoint.y);
+        overlayContext.lineWidth = dynamicWidth;
         overlayContext.stroke();
+        overlayContext.globalAlpha = 100;
     }
 
     function eraseStroke(x, y) {
-        const dpr = window.devicePixelRatio || 1;
-        const eraseRadius = penWidth * 5 * dpr;
+        const eraseRadius = penWidth * 5;
         overlayContext.globalCompositeOperation = 'destination-out';
         overlayContext.beginPath();
         overlayContext.arc(x, y, eraseRadius, 0, Math.PI * 2);
@@ -1649,9 +1602,6 @@ body {
 
     overlayCanvas.addEventListener('wheel', (e) => {
         if (!isLocked) e.preventDefault();
-    });
-document.getElementById('refreshButton').addEventListener('click', () => {
-        window.location.reload();
     });
 
     // Window resize handling
