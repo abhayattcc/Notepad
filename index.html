@@ -1509,100 +1509,117 @@
         e.preventDefault();
     }
 
-    // Drawing and Swipe Event Listeners
-    overlayCanvas.addEventListener('mousedown', (e) => {
-        if (currentSection === 'drawing' && isDrawing && !isLocked) {
+// Drawing and Swipe Event Listeners
+overlayCanvas.addEventListener('mousedown', (e) => {
+    if (currentSection === 'drawing' && !isLocked) {
+        if (e.button === 0) { // Left click = 1 finger touch (drawing)
+            isDrawing = true;
+            isErasing = false;
+            document.getElementById('drawButton').classList.add('active');
+            document.getElementById('eraseButton').classList.remove('active');
             lastPoint = getCoordinates(e);
             lastTime = lastPoint.time;
             strokePoints = [lastPoint];
-        } else if (currentSection === 'drawing' && isErasing && !isLocked) {
+        } else if (e.button === 2) { // Right click = 2 finger touch (erasing)
+            isErasing = true;
+            isDrawing = false;
+            document.getElementById('eraseButton').classList.add('active');
+            document.getElementById('drawButton').classList.remove('active');
             const point = getCoordinates(e);
             strokePoints = [point];
             eraseStroke(point.x, point.y);
         }
-    });
+        e.preventDefault();
+    }
+});
 
-    overlayCanvas.addEventListener('mousemove', (e) => {
-        if (currentSection === 'drawing' && isDrawing && !isLocked) {
+overlayCanvas.addEventListener('contextmenu', (e) => {
+    e.preventDefault(); // Prevent default context menu on right click
+});
+
+overlayCanvas.addEventListener('mousemove', (e) => {
+    if (currentSection === 'drawing' && !isLocked) {
+        if (isDrawing) {
             addPoint(e);
-        } else if (currentSection === 'drawing' && isErasing && !isLocked) {
+        } else if (isErasing) {
             const point = getCoordinates(e);
             strokePoints.push(point);
             eraseStroke(point.x, point.y);
         }
-    });
+    }
+});
 
-    overlayCanvas.addEventListener('mouseup', () => {
-        if (currentSection === 'drawing' && (isDrawing || isErasing) && !isLocked && strokePoints.length > 0) {
-            saveCanvasState(strokePoints);
-            redoStack = [];
-            strokePoints = [];
-            lastPoint = null;
-        }
-    });
+overlayCanvas.addEventListener('mouseup', (e) => {
+    if (currentSection === 'drawing' && !isLocked && (isDrawing || isErasing) && strokePoints.length > 0) {
+        saveCanvasState(strokePoints);
+        redoStack = [];
+        strokePoints = [];
+        lastPoint = null;
+    }
+});
 
-    overlayCanvas.addEventListener('touchstart', (e) => {
-        if (currentSection === 'drawing') {
-            if (isLocked && e.touches.length === 1) {
-                touchStartX = e.touches[0].clientX;
-                touchStartY = e.touches[0].clientY;
-            } else if (!isLocked && e.touches.length === 1) {
-                isDrawing = true;
-                isErasing = false;
-                document.getElementById('drawButton').classList.add('active');
-                document.getElementById('eraseButton').classList.remove('active');
-                lastPoint = getCoordinates(e);
-                lastTime = lastPoint.time;
-                strokePoints = [lastPoint];
-            } else if (!isLocked && e.touches.length === 2) {
-                isErasing = true;
-                isDrawing = false;
-                document.getElementById('eraseButton').classList.add('active');
-                document.getElementById('drawButton').classList.remove('active');
-                const point = getCoordinates(e);
-                strokePoints = [point];
-                eraseStroke(point.x, point.y);
-            } else if (!isLocked && e.touches.length === 3) {
-                undo();
-                e.preventDefault();
-                return;
-            }
+overlayCanvas.addEventListener('touchstart', (e) => {
+    if (currentSection === 'drawing') {
+        if (isLocked && e.touches.length === 1) {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        } else if (!isLocked && e.touches.length === 1) {
+            isDrawing = true;
+            isErasing = false;
+            document.getElementById('drawButton').classList.add('active');
+            document.getElementById('eraseButton').classList.remove('active');
+            lastPoint = getCoordinates(e);
+            lastTime = lastPoint.time;
+            strokePoints = [lastPoint];
+        } else if (!isLocked && e.touches.length === 2) {
+            isErasing = true;
+            isDrawing = false;
+            document.getElementById('eraseButton').classList.add('active');
+            document.getElementById('drawButton').classList.remove('active');
+            const point = getCoordinates(e);
+            strokePoints = [point];
+            eraseStroke(point.x, point.y);
+        } else if (!isLocked && e.touches.length === 3) {
+            undo();
             e.preventDefault();
-        }
-    });
-
-    overlayCanvas.addEventListener('touchmove', (e) => {
-        if (currentSection === 'drawing' && !isLocked && (e.touches.length === 1 || e.touches.length === 2)) {
-            addPoint(e);
-            e.preventDefault();
-        }
-    });
-
-    overlayCanvas.addEventListener('touchend', (e) => {
-        if (currentSection === 'drawing' && isLocked && e.changedTouches.length === 1) {
-            const touchEndX = e.changedTouches[0].clientX;
-            const deltaX = touchEndX - touchStartX;
-            const deltaY = touchStartY - e.changedTouches[0].clientY;
-            const swipeThreshold = 100;
-            if (Math.abs(deltaX) > swipeThreshold && Math.abs(deltaY) < swipeThreshold) {
-                if (deltaX > 0) {
-                    previousPage();
-                } else {
-                    nextPage();
-                }
-            }
-        } else if (currentSection === 'drawing' && !isLocked && e.changedTouches.length >= 1 && (isDrawing || isErasing) && strokePoints.length > 0) {
-            saveCanvasState(strokePoints);
-            redoStack = [];
-            strokePoints = [];
-            lastPoint = null;
+            return;
         }
         e.preventDefault();
-    });
+    }
+});
 
-    overlayCanvas.addEventListener('wheel', (e) => {
-        if (!isLocked) e.preventDefault();
-    });
+overlayCanvas.addEventListener('touchmove', (e) => {
+    if (currentSection === 'drawing' && !isLocked && (e.touches.length === 1 || e.touches.length === 2)) {
+        addPoint(e);
+        e.preventDefault();
+    }
+});
+
+overlayCanvas.addEventListener('touchend', (e) => {
+    if (currentSection === 'drawing' && isLocked && e.changedTouches.length === 1) {
+        const touchEndX = e.changedTouches[0].clientX;
+        const deltaX = touchEndX - touchStartX;
+        const deltaY = touchStartY - e.changedTouches[0].clientY;
+        const swipeThreshold = 100;
+        if (Math.abs(deltaX) > swipeThreshold && Math.abs(deltaY) < swipeThreshold) {
+            if (deltaX > 0) {
+                previousPage();
+            } else {
+                nextPage();
+            }
+        }
+    } else if (currentSection === 'drawing' && !isLocked && e.changedTouches.length >= 1 && (isDrawing || isErasing) && strokePoints.length > 0) {
+        saveCanvasState(strokePoints);
+        redoStack = [];
+        strokePoints = [];
+        lastPoint = null;
+    }
+    e.preventDefault();
+});
+
+overlayCanvas.addEventListener('wheel', (e) => {
+    if (!isLocked) e.preventDefault();
+});
 
     // Window resize handling
     window.addEventListener('resize', resizeCanvas);
