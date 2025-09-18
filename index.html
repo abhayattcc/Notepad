@@ -354,12 +354,7 @@
         </div>
     </div>
 </div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
-    // Set PDF.js worker source
-    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js';
-
     // Session Storage for Drawings (temporary, cleared on reload)
     let sessionCanvasPages = {};
     let currentSection = 'text';
@@ -381,6 +376,7 @@
     let textUndoStack = [];
     let textRedoStack = [];
     let textChangeTimeout = null;
+    let drawingChangeTimeout = null;
     let strokePoints = [];
     let currentPdf = null;
     let pdfPageCount = 0;
@@ -388,6 +384,7 @@
     let lastTime = 0;
     let touchStartX = 0;
     let touchStartY = 0;
+    let drawingData = { id: 'current', pages: [], pdfId: null, pageCount: 0 };
 
     // Initialize canvases
     const canvas = document.getElementById('drawingCanvas');
@@ -402,8 +399,6 @@
     // Initialize text editor
     const textEditor = document.getElementById('textEditor');
     const savedTextList = document.getElementById('savedTextList');
-    textUndoStack.push({ text: '', saved: cloneState(savedTexts, deletedTexts) });
-    textEditor.addEventListener('input', optimizeTextInput);
 
     // Tooltip functionality
     function showTooltip(button) {
@@ -435,7 +430,7 @@
         button.addEventListener('click', () => showTooltip(button));
     });
 
-    // IndexedDB Setup for Text Only
+    // IndexedDB Setup
     const DB_NAME = 'KidsNotepadDB';
     const DB_VERSION = 1;
     let dbPromise = initIndexedDB();
@@ -446,8 +441,24 @@
 
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
-                db.createObjectStore('savedTexts', { keyPath: 'id' });
-                db.createObjectStore('deletedTexts', { keyPath: 'id' });
+                if (!db.objectStoreNames.contains('savedTexts')) {
+                    db.createObjectStore('savedTexts', { keyPath: 'id' });
+                }
+                if (!db.objectStoreNames.contains('deletedTexts')) {
+                    db.createObjectStore('deletedTexts', { keyPath: 'id' });
+                }
+                if (!db.objectStoreNames.contains('currentText')) {
+                    db.createObjectStore('currentText', { keyPath: 'id' });
+                }
+                if (!db.objectStoreNames.contains('drawings')) {
+                    db.createObjectStore('drawings', { keyPath: 'id' });
+                }
+                if (!db.objectStoreNames.contains('blobs')) {
+                    db.createObjectStore('blobs', { keyPath: 'id' });
+                }
+                if (!db.objectStoreNames.contains('libs')) {
+                    db.createObjectStore('libs', { keyPath: 'id' });
+                }
             };
 
             request.onsuccess = (event) => {
@@ -468,6 +479,18 @@
                 console.error('IndexedDB error:', event.target.error);
                 reject(event.target.error);
             };
+        });
+    }
+
+    async function getFromStore(storeName, id) {
+        const db = await dbPromise;
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction([storeName], 'readonly');
+            const store = transaction.objectStore(storeName);
+            const request = store.get(id);
+
+            request.onsuccess = () => resolve(request.result);
+            request.onerror = () => reject(request.error);
         });
     }
 
@@ -514,6 +537,91 @@
         });
     }
 
+    async function getBlob(id) {
+        const db = await dbPromise;
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(['blobs'], 'readonly');
+            const store = transaction.objectStore('blobs');
+            const request = store.get(id);
+
+            request.onsuccess = () => resolve(request.result ? request.result.blob : null);
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async function putBlob(id, blob) {
+        const db = await dbPromise;
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(['blobs'], 'readwrite');
+            const store = transaction.objectStore('blobs');
+            const request = store.put({ id, blob });
+
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    }
+
+    async function loadLibs() {
+        const pdfUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.min.js';
+        const workerUrl = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.10.377/pdf.worker.min.js';
+        const jspdfUrl = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+
+        let pdfLib = await getFromStore('libs', 'pdf');
+        if (!pdfLib) {
+            try {
+                const response = await fetch(pdfUrl);
+                if (!response.ok) throw new Error('Fetch failed');
+                const script = await response.text();
+                await putToStore('libs', { id: 'pdf', script });
+                pdfLib = { script };
+            } catch (err) {
+                console.error('Failed to load PDF.js:', err);
+                throw err;
+            }
+        }
+
+        let workerLib = await getFromStore('libs', 'worker');
+        if (!workerLib) {
+            try {
+                const response = await fetch(workerUrl);
+                if (!response.ok) throw new Error('Fetch failed');
+                const script = await response.text();
+                await putToStore('libs', { id: 'worker', script });
+                workerLib = { script };
+            } catch (err) {
+                console.error('Failed to load PDF worker:', err);
+                throw err;
+            }
+        }
+
+        let jspdfLib = await getFromStore('libs', 'jspdf');
+        if (!jspdfLib) {
+            try {
+                const response = await fetch(jspdfUrl);
+                if (!response.ok) throw new Error('Fetch failed');
+                const script = await response.text();
+                await putToStore('libs', { id: 'jspdf', script });
+                jspdfLib = { script };
+            } catch (err) {
+                console.error('Failed to load jsPDF:', err);
+                throw err;
+            }
+        }
+
+        // Inject scripts
+        const pdfScript = document.createElement('script');
+        pdfScript.textContent = pdfLib.script;
+        document.head.appendChild(pdfScript);
+
+        const workerBlob = new Blob([workerLib.script], { type: 'application/javascript' });
+        const workerBlobUrl = URL.createObjectURL(workerBlob);
+        pdfjsLib.GlobalWorkerOptions.workerSrc = workerBlobUrl;
+
+        const jspdfScript = document.createElement('script');
+        jspdfScript.textContent = jspdfLib.script;
+        document.head.appendChild(jspdfScript);
+    }
+
     function cloneState(saved, deleted) {
         const savedStr = JSON.stringify(saved);
         const deletedStr = JSON.stringify(deleted);
@@ -554,24 +662,138 @@
         }
     }
 
-    // Initialize IndexedDB and load text data
-    dbPromise.then(async db => {
+    async function saveCurrentText() {
+        const item = { id: 'current', text: textEditor.value, date: new Date() };
+        await putToStore('currentText', item);
+    }
+
+    async function loadCurrentText() {
         try {
-            savedTexts = await getAllFromStore('savedTexts');
-            deletedTexts = await getAllFromStore('deletedTexts');
-            const initialState = { text: textEditor.value, ...cloneState(savedTexts, deletedTexts) };
-            textUndoStack[0] = initialState;
+            const item = await getFromStore('currentText', 'current');
+            if (item) {
+                textEditor.value = item.text;
+            }
         } catch (err) {
-            console.error('Failed to load data from IndexedDB:', err);
+            console.error('Failed to load current text:', err);
+        }
+    }
+
+    async function loadDrawingData() {
+        try {
+            const data = await getFromStore('drawings', 'current');
+            if (data) {
+                drawingData = data;
+                drawingData.pages.sort((a, b) => a.index - b.index);
+                drawingData.pages.forEach((p, i) => { p.index = i; });
+
+                const numPdfPages = drawingData.pdfId ? drawingData.pageCount : 0;
+                const numDrawingPages = drawingData.pages.length;
+                const totalPages = Math.max(numPdfPages, numDrawingPages);
+                canvasPages = Array(totalPages).fill(null).map(() => document.createElement('canvas'));
+                sessionCanvasPages = {};
+
+                drawingData.pages.forEach(p => {
+                    const c = canvasPages[p.index];
+                    if (p.width && p.height) {
+                        c.width = p.width;
+                        c.height = p.height;
+                    }
+                    sessionCanvasPages[`canvasPage_${p.index}`] = { dataURL: p.dataURL };
+                });
+
+                currentPageIndex = 0;
+
+                if (drawingData.pdfId) {
+                    const blob = await getBlob(drawingData.pdfId);
+                    if (blob) {
+                        const arrayBuffer = await blob.arrayBuffer();
+                        const loadingTask = pdfjsLib.getDocument({
+                            data: arrayBuffer,
+                            disableAutoFetch: true,
+                            disableStream: true,
+                            disableFontFace: true,
+                            nativeImageDecoderSupport: 'decode',
+                            maxImageSize: 1024 * 1024,
+                            isEvalSupported: false
+                        });
+                        currentPdf = await loadingTask.promise;
+                        pdfPageCount = drawingData.pageCount;
+
+                        // Render PDF pages to canvasPages
+                        const renderPromises = [];
+                        for (let i = 0; i < pdfPageCount; i++) {
+                            renderPromises.push(renderPdfToCanvas(i));
+                        }
+                        await Promise.all(renderPromises);
+                    }
+                }
+
+                // Update page selector
+                const selector = document.getElementById('pageSelector');
+                selector.innerHTML = '';
+                for (let i = 1; i <= totalPages; i++) {
+                    const option = document.createElement('option');
+                    option.value = i;
+                    option.text = `Page ${i}`;
+                    selector.appendChild(option);
+                }
+                if (totalPages > 0) {
+                    selector.value = 1;
+                    await renderPage(1);
+                }
+            } else {
+                // Default initial drawing
+                drawingData = { id: 'current', pages: [{ index: 0, dataURL: null, width: 0, height: 0 }], pdfId: null, pageCount: 0 };
+                await putToStore('drawings', drawingData);
+            }
+        } catch (err) {
+            console.error('Failed to load drawing data:', err);
+        }
+    }
+
+    async function renderPdfToCanvas(index) {
+        const page = await currentPdf.getPage(index + 1);
+        const viewport = page.getViewport({ scale: 3 });
+        const c = canvasPages[index];
+        c.width = viewport.width;
+        c.height = viewport.height;
+        const ctx = c.getContext('2d', { willReadFrequently: true });
+        ctx.clearRect(0, 0, c.width, c.height);
+        await page.render({
+            canvasContext: ctx,
+            viewport: viewport,
+            enableWebGL: true
+        }).promise;
+    }
+
+    async function saveDrawingData() {
+        await putToStore('drawings', drawingData);
+    }
+
+    // Initialize IndexedDB and load data
+    dbPromise.then(async () => {
+        try {
+            await loadLibs();
+            savedTexts = await getAllFromStore('savedTexts') || {};
+            deletedTexts = await getAllFromStore('deletedTexts') || {};
+            await loadCurrentText();
+            const initialState = { text: textEditor.value, ...cloneState(savedTexts, deletedTexts) };
+            textUndoStack = [initialState];
+            await loadDrawingData();
+        } catch (err) {
+            console.error('Failed to initialize:', err);
         }
     }).catch(err => console.error('Failed to initialize IndexedDB:', err));
 
+    textEditor.addEventListener('input', optimizeTextInput);
+
     // Optimize text input
-    function optimizeTextInput() {
+    async function optimizeTextInput() {
         clearTimeout(textChangeTimeout);
-        textChangeTimeout = setTimeout(() => {
+        textChangeTimeout = setTimeout(async () => {
             if (textEditor.value !== textUndoStack[textUndoStack.length - 1].text) {
                 saveTextState();
+                await saveCurrentText();
             }
         }, 300);
     }
@@ -628,12 +850,15 @@
     }
 
     // Tab switching and collapsing
-    function toggleSection(section) {
+    async function toggleSection(section) {
         const tabs = document.getElementById('tabs');
         const toolbar = document.getElementById('toolbar');
         const content = document.getElementById('content');
 
-        // Save current page drawing before switching
+        // Save current before switching
+        if (currentSection === 'text') {
+            await saveCurrentText();
+        }
         if (currentSection === 'drawing') {
             saveCanvasState();
         }
@@ -746,6 +971,7 @@
         savedTexts = prevState.saved;
         deletedTexts = prevState.deleted;
         await syncStores();
+        await saveCurrentText();
     }
 
     async function redoText() {
@@ -762,6 +988,7 @@
         savedTexts = nextState.saved;
         deletedTexts = nextState.deleted;
         await syncStores();
+        await saveCurrentText();
     }
 
     // Text Editor Functions
@@ -772,6 +999,7 @@
         const replace = prompt('Replace with?');
         textEditor.value = textEditor.value.replace(new RegExp(find, 'g'), replace);
         saveTextState();
+        saveCurrentText();
     }
 
     function selectAll() {
@@ -787,6 +1015,7 @@
         saveTextState();
         textEditor.value = '';
         saveTextState();
+        saveCurrentText();
     }
 
     async function saveText() {
@@ -867,6 +1096,7 @@
                             delete deletedTexts[id];
                             textEditor.value = savedTexts[id].text;
                             saveTextState();
+                            await saveCurrentText();
                             alert('Text restored!');
                             showSection('text');
                         } catch (err) {
@@ -888,6 +1118,7 @@
                         saveTextState();
                         textEditor.value = savedTexts[id].text;
                         saveTextState();
+                        await saveCurrentText();
                         showSection('text');
                     }
                 };
@@ -963,7 +1194,13 @@
             const file = e.target.files[0];
             if (!file) return;
 
-            saveTextState();
+            // Save current state before opening
+            if (currentSection === 'text') {
+                await saveCurrentText();
+            } else if (currentSection === 'drawing') {
+                saveCanvasState();
+            }
+
             const progressBarContainer = document.getElementById('progressBarContainer');
             const progressFill = document.getElementById('progressFill');
             const progressText = document.getElementById('progressText');
@@ -976,19 +1213,26 @@
                 const text = await file.text();
                 textEditor.value = text;
                 saveTextState();
+                await saveCurrentText();
                 progressBarContainer.classList.add('hidden');
                 showSection('text');
             } else if (file.type === 'application/pdf') {
                 try {
-                    // Clear previous session data
+                    // Clear previous PDF data
+                    const oldPdfId = drawingData.pdfId;
+                    if (oldPdfId) {
+                        await deleteFromStore('blobs', oldPdfId);
+                    }
                     currentPdf = null;
                     pdfPageCount = 0;
-                    canvasPages = [document.createElement('canvas')];
-                    sessionCanvasPages = { 'canvasPage_0': { dataURL: null } };
-                    currentPageIndex = 0;
+                    canvasPages = [];
+                    sessionCanvasPages = {};
                     undoStack = [];
                     redoStack = [];
                     overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+
+                    const pdfId = `pdf_${Date.now()}`;
+                    await putBlob(pdfId, file);
 
                     const arrayBuffer = await file.arrayBuffer();
                     const loadingTask = pdfjsLib.getDocument({
@@ -1035,6 +1279,7 @@
                     if (textContent.length > 0) {
                         textEditor.value = textContent;
                         saveTextState();
+                        await saveCurrentText();
                         updateProgress(2, totalSteps);
                         progressBarContainer.classList.add('hidden');
                         showSection('text');
@@ -1042,6 +1287,11 @@
                     } else {
                         totalSteps = pdfPageCount + 2;
                         updateProgress(2, totalSteps);
+
+                        drawingData.pdfId = pdfId;
+                        drawingData.pageCount = pdfPageCount;
+                        drawingData.pages = Array(pdfPageCount).fill(null).map((_, i) => ({ index: i, dataURL: null, width: 0, height: 0 }));
+                        await saveDrawingData();
 
                         const selector = document.getElementById('pageSelector');
                         selector.innerHTML = '';
@@ -1051,7 +1301,7 @@
                             option.text = `Page ${i}`;
                             selector.appendChild(option);
                         }
-                        canvasPages = Array(pdfPageCount).fill().map(() => document.createElement('canvas'));
+                        canvasPages = Array(pdfPageCount).fill(null).map(() => document.createElement('canvas'));
                         for (let i = 0; i < pdfPageCount; i++) {
                             sessionCanvasPages[`canvasPage_${i}`] = { dataURL: null };
                         }
@@ -1062,7 +1312,7 @@
                         document.getElementById('drawingCanvas').classList.add('locked');
                         document.getElementById('overlayCanvas').classList.add('locked');
                         showSection('drawing');
-                        renderPage(1);
+                        await renderPage(1);
                     }
                 } catch (err) {
                     console.error('PDF loading failed:', err);
@@ -1332,15 +1582,18 @@
         }
     }
 
-    function addCanvasPage() {
+    async function addCanvasPage() {
         saveCanvasState();
         const content = document.querySelector('.content');
+        const newIndex = currentPageIndex + 1;
         const newCanvas = document.createElement('canvas');
         newCanvas.width = content.offsetWidth;
         newCanvas.height = content.offsetHeight;
-        canvasPages.splice(currentPageIndex + 1, 0, newCanvas);
-        sessionCanvasPages[`canvasPage_${currentPageIndex + 1}`] = { dataURL: null };
-        currentPageIndex = currentPageIndex + 1;
+        canvasPages.splice(newIndex, 0, newCanvas);
+        const newPageData = { index: newIndex, dataURL: null, width: newCanvas.width, height: newCanvas.height };
+        drawingData.pages.splice(newIndex, 0, newPageData);
+        sessionCanvasPages[`canvasPage_${newIndex}`] = { dataURL: null };
+        currentPageIndex = newIndex;
         const selector = document.getElementById('pageSelector');
         selector.innerHTML = '';
         for (let i = 1; i <= canvasPages.length; i++) {
@@ -1350,6 +1603,7 @@
             selector.appendChild(option);
         }
         selector.value = currentPageIndex + 1;
+        await saveDrawingData();
         undoStack = [];
         redoStack = [];
         overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
@@ -1361,17 +1615,24 @@
         resizeCanvas();
     }
 
-    function clearCurrentPage() {
+    async function clearCurrentPage() {
         // Save the current state before clearing
         const dataURL = overlayCanvas.toDataURL();
         undoStack.push({ dataURL, points: [], bounds: null });
         if (undoStack.length > 50) undoStack.shift();
         redoStack = [];
 
+        const oldIndex = currentPageIndex;
         overlayCanvas.style.opacity = '0';
-        setTimeout(() => {
+        setTimeout(async () => {
             overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-            sessionCanvasPages[`canvasPage_${currentPageIndex}`] = { dataURL: overlayCanvas.toDataURL() };
+            let pageData = drawingData.pages.find(p => p.index === currentPageIndex);
+            if (!pageData) {
+                pageData = { index: currentPageIndex, dataURL: '', width: overlayCanvas.width, height: overlayCanvas.height };
+                drawingData.pages.push(pageData);
+            }
+            pageData.dataURL = overlayCanvas.toDataURL();
+            await saveDrawingData();
             overlayCanvas.style.opacity = '1';
             const currentCanvas = canvasPages[currentPageIndex];
             const ctx = currentCanvas.getContext('2d');
@@ -1379,7 +1640,14 @@
             const isEmpty = Array.from(imageData).every(pixel => pixel === 0 || pixel === 255);
             if (isEmpty && canvasPages.length > 1 && currentPageIndex >= pdfPageCount) {
                 canvasPages.splice(currentPageIndex, 1);
-                delete sessionCanvasPages[`canvasPage_${currentPageIndex}`];
+                drawingData.pages = drawingData.pages.filter(p => p.index !== currentPageIndex);
+                // Rebuild sessionCanvasPages
+                sessionCanvasPages = {};
+                drawingData.pages.forEach(p => {
+                    sessionCanvasPages[`canvasPage_${p.index}`] = { dataURL: p.dataURL };
+                });
+                // Reindex
+                drawingData.pages.forEach((p, i) => p.index = i);
                 if (currentPageIndex >= canvasPages.length) {
                     currentPageIndex = canvasPages.length - 1;
                 }
@@ -1392,7 +1660,8 @@
                     selector.appendChild(option);
                 }
                 selector.value = currentPageIndex + 1;
-                renderPage(currentPageIndex + 1);
+                await renderPage(currentPageIndex + 1);
+                await saveDrawingData();
             } else {
                 redrawCanvas();
             }
@@ -1415,6 +1684,18 @@
         undoStack.push({ dataURL, points, bounds });
         if (undoStack.length > 50) undoStack.shift();
         sessionCanvasPages[`canvasPage_${currentPageIndex}`] = { dataURL };
+        let pageData = drawingData.pages.find(p => p.index === currentPageIndex);
+        if (!pageData) {
+            pageData = { index: currentPageIndex, dataURL: '', width: 0, height: 0 };
+            drawingData.pages.push(pageData);
+        }
+        pageData.dataURL = dataURL;
+        pageData.width = overlayCanvas.width;
+        pageData.height = overlayCanvas.height;
+        clearTimeout(drawingChangeTimeout);
+        drawingChangeTimeout = setTimeout(async () => {
+            await saveDrawingData();
+        }, 500);
     }
 
     function calculateStrokeBounds(points) {
@@ -1439,6 +1720,7 @@
             overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
             sessionCanvasPages[`canvasPage_${currentPageIndex}`] = { dataURL: overlayCanvas.toDataURL() };
             undoStack = [];
+            saveCanvasState();
             redrawCanvas();
             return;
         }
@@ -1452,6 +1734,7 @@
             overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
             overlayContext.drawImage(img, 0, 0, overlayCanvas.width, overlayCanvas.height);
             sessionCanvasPages[`canvasPage_${currentPageIndex}`] = { dataURL: overlayCanvas.toDataURL() };
+            saveCanvasState();
             redrawCanvas();
             isDrawing = true;
             isErasing = false;
@@ -1472,6 +1755,7 @@
             overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
             overlayContext.drawImage(img, 0, 0, overlayCanvas.width, overlayCanvas.height);
             sessionCanvasPages[`canvasPage_${currentPageIndex}`] = { dataURL: overlayCanvas.toDataURL() };
+            saveCanvasState();
             redrawCanvas();
         };
     }
