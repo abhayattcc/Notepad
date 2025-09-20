@@ -365,14 +365,12 @@
     let isDrawing = false;
     let isErasing = false;
     let isLocked = false;
-    let penWidth = 2;
+    let penWidth = 5;
     let penColor = "#0000ff";
     let savedTexts = {};
     let deletedTexts = {};
     let canvasContext = null;
     let overlayContext = null;
-    let undoStack = [];
-    let redoStack = [];
     let textUndoStack = [];
     let textRedoStack = [];
     let textChangeTimeout = null;
@@ -385,6 +383,10 @@
     let touchStartX = 0;
     let touchStartY = 0;
     let drawingData = { id: 'current', pages: [], pdfId: null, pageCount: 0 };
+    let pageHistories = {};
+    let currentHistory = null;
+    let liveScale = 2;
+    let exportScale = 3;
 
     // Initialize canvases
     const canvas = document.getElementById('drawingCanvas');
@@ -685,6 +687,11 @@
                 drawingData = data;
                 drawingData.pages.sort((a, b) => a.index - b.index);
                 drawingData.pages.forEach((p, i) => { p.index = i; });
+                drawingData.pages.forEach(p => {
+                    if (!p.id) {
+                        p.id = `page_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+                    }
+                });
 
                 const numPdfPages = drawingData.pdfId ? drawingData.pageCount : 0;
                 const numDrawingPages = drawingData.pages.length;
@@ -743,7 +750,8 @@
                 }
             } else {
                 // Default initial drawing
-                drawingData = { id: 'current', pages: [{ index: 0, dataURL: null, width: 0, height: 0 }], pdfId: null, pageCount: 0 };
+                const initialId = 'page_0';
+                drawingData = { id: 'current', pages: [{ index: 0, dataURL: null, width: 0, height: 0, id: initialId }], pdfId: null, pageCount: 0 };
                 await putToStore('drawings', drawingData);
             }
         } catch (err) {
@@ -753,7 +761,7 @@
 
     async function renderPdfToCanvas(index) {
         const page = await currentPdf.getPage(index + 1);
-        const viewport = page.getViewport({ scale: 3 });
+        const viewport = page.getViewport({ scale: liveScale });
         const c = canvasPages[index];
         c.width = viewport.width;
         c.height = viewport.height;
@@ -768,6 +776,21 @@
 
     async function saveDrawingData() {
         await putToStore('drawings', drawingData);
+    }
+
+    function initCurrentHistory() {
+        if (currentPageIndex >= drawingData.pages.length) return;
+        const pageData = drawingData.pages[currentPageIndex];
+        if (!pageData.id) {
+            pageData.id = `page_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+        }
+        if (!pageHistories[pageData.id]) {
+            pageHistories[pageData.id] = { undo: [], redo: [] };
+        }
+        currentHistory = pageHistories[pageData.id];
+        if (currentHistory.undo.length === 0) {
+            currentHistory.undo.push({ dataURL: overlayCanvas.toDataURL(), points: [], bounds: null });
+        }
     }
 
     // Initialize IndexedDB and load data
@@ -1227,8 +1250,7 @@
                     pdfPageCount = 0;
                     canvasPages = [];
                     sessionCanvasPages = {};
-                    undoStack = [];
-                    redoStack = [];
+                    pageHistories = {};
                     overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
 
                     const pdfId = `pdf_${Date.now()}`;
@@ -1290,7 +1312,7 @@
 
                         drawingData.pdfId = pdfId;
                         drawingData.pageCount = pdfPageCount;
-                        drawingData.pages = Array(pdfPageCount).fill(null).map((_, i) => ({ index: i, dataURL: null, width: 0, height: 0 }));
+                        drawingData.pages = Array(pdfPageCount).fill(null).map((_, i) => ({ index: i, dataURL: null, width: 0, height: 0, id: `pdfpage_${i}` }));
                         await saveDrawingData();
 
                         const selector = document.getElementById('pageSelector');
@@ -1357,7 +1379,7 @@
 
         if (currentPdf && currentPageIndex < pdfPageCount) {
             const page = await currentPdf.getPage(pageNum);
-            const viewport = page.getViewport({ scale: 3 });
+            const viewport = page.getViewport({ scale: liveScale });
             imgWidth = viewport.width;
             imgHeight = viewport.height;
             canvasPages[currentPageIndex].width = imgWidth;
@@ -1400,6 +1422,8 @@
             overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
             redrawCanvas();
         }
+
+        initCurrentHistory();
     }
 
     // File download helper
@@ -1431,7 +1455,7 @@
 
         if (currentPdf && currentPageIndex < pdfPageCount) {
             const page = await currentPdf.getPage(currentPageIndex + 1);
-            const viewport = page.getViewport({ scale: 3 });
+            const viewport = page.getViewport({ scale: exportScale });
             tempCanvas.width = viewport.width;
             tempCanvas.height = viewport.height;
             await page.render({
@@ -1470,13 +1494,13 @@
         for (let i = 0; i < canvasPages.length; i++) {
             if (i > 0) doc.addPage();
             const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = canvasPages[i].width;
-            tempCanvas.height = canvasPages[i].height;
+            tempCanvas.width = canvasPages[i].width * (exportScale / liveScale);
+            tempCanvas.height = canvasPages[i].height * (exportScale / liveScale);
             const ctx = tempCanvas.getContext('2d');
 
             if (currentPdf && i < pdfPageCount) {
                 const page = await currentPdf.getPage(i + 1);
-                const viewport = page.getViewport({ scale: 3 });
+                const viewport = page.getViewport({ scale: exportScale });
                 tempCanvas.width = viewport.width;
                 tempCanvas.height = viewport.height;
                 await page.render({
@@ -1580,6 +1604,10 @@
                 redrawCanvas();
             }
         }
+
+        if (currentSection === 'drawing') {
+            initCurrentHistory();
+        }
     }
 
     async function addCanvasPage() {
@@ -1589,10 +1617,12 @@
         const newCanvas = document.createElement('canvas');
         newCanvas.width = content.offsetWidth;
         newCanvas.height = content.offsetHeight;
-        canvasPages.splice(newIndex, 0, newCanvas);
-        const newPageData = { index: newIndex, dataURL: null, width: newCanvas.width, height: newCanvas.height };
+        const newId = `page_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
+        const newPageData = { index: newIndex, dataURL: null, width: newCanvas.width, height: newCanvas.height, id: newId };
         drawingData.pages.splice(newIndex, 0, newPageData);
+        canvasPages.splice(newIndex, 0, newCanvas);
         sessionCanvasPages[`canvasPage_${newIndex}`] = { dataURL: null };
+        pageHistories[newId] = { undo: [{ dataURL: '', points: [], bounds: null }], redo: [] };
         currentPageIndex = newIndex;
         const selector = document.getElementById('pageSelector');
         selector.innerHTML = '';
@@ -1603,9 +1633,8 @@
             selector.appendChild(option);
         }
         selector.value = currentPageIndex + 1;
+        currentHistory = pageHistories[newId];
         await saveDrawingData();
-        undoStack = [];
-        redoStack = [];
         overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
         redrawCanvas();
     }
@@ -1616,23 +1645,24 @@
     }
 
     async function clearCurrentPage() {
+        if (!currentHistory) return;
         // Save the current state before clearing
         const dataURL = overlayCanvas.toDataURL();
-        undoStack.push({ dataURL, points: [], bounds: null });
-        if (undoStack.length > 50) undoStack.shift();
-        redoStack = [];
+        currentHistory.undo.push({ dataURL, points: [], bounds: null });
+        if (currentHistory.undo.length > 50) currentHistory.undo.shift();
+        currentHistory.redo = [];
 
         const oldIndex = currentPageIndex;
+        const pageData = drawingData.pages[currentPageIndex];
+        const removedId = pageData ? pageData.id : null;
         overlayCanvas.style.opacity = '0';
         setTimeout(async () => {
             overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-            let pageData = drawingData.pages.find(p => p.index === currentPageIndex);
-            if (!pageData) {
-                pageData = { index: currentPageIndex, dataURL: '', width: overlayCanvas.width, height: overlayCanvas.height };
-                drawingData.pages.push(pageData);
+            sessionCanvasPages[`canvasPage_${currentPageIndex}`] = { dataURL: overlayCanvas.toDataURL() };
+            if (pageData) {
+                pageData.dataURL = overlayCanvas.toDataURL();
             }
-            pageData.dataURL = overlayCanvas.toDataURL();
-            await saveDrawingData();
+            currentHistory.undo.push({ dataURL: overlayCanvas.toDataURL(), points: [], bounds: null });
             overlayCanvas.style.opacity = '1';
             const currentCanvas = canvasPages[currentPageIndex];
             const ctx = currentCanvas.getContext('2d');
@@ -1648,6 +1678,9 @@
                 });
                 // Reindex
                 drawingData.pages.forEach((p, i) => p.index = i);
+                if (removedId) {
+                    delete pageHistories[removedId];
+                }
                 if (currentPageIndex >= canvasPages.length) {
                     currentPageIndex = canvasPages.length - 1;
                 }
@@ -1664,6 +1697,8 @@
                 await saveDrawingData();
             } else {
                 redrawCanvas();
+                clearTimeout(drawingChangeTimeout);
+                drawingChangeTimeout = setTimeout(saveDrawingData, 500);
             }
         }, 500);
     }
@@ -1679,19 +1714,19 @@
     }
 
     function saveCanvasState(points = []) {
+        if (!currentHistory) return;
         const dataURL = overlayCanvas.toDataURL();
         const bounds = points.length > 0 ? calculateStrokeBounds(points) : null;
-        undoStack.push({ dataURL, points, bounds });
-        if (undoStack.length > 50) undoStack.shift();
+        currentHistory.undo.push({ dataURL, points, bounds });
+        if (currentHistory.undo.length > 50) currentHistory.undo.shift();
+        currentHistory.redo = [];
         sessionCanvasPages[`canvasPage_${currentPageIndex}`] = { dataURL };
-        let pageData = drawingData.pages.find(p => p.index === currentPageIndex);
-        if (!pageData) {
-            pageData = { index: currentPageIndex, dataURL: '', width: 0, height: 0 };
-            drawingData.pages.push(pageData);
+        const pageData = drawingData.pages.find(p => p.index === currentPageIndex);
+        if (pageData) {
+            pageData.dataURL = dataURL;
+            pageData.width = overlayCanvas.width;
+            pageData.height = overlayCanvas.height;
         }
-        pageData.dataURL = dataURL;
-        pageData.width = overlayCanvas.width;
-        pageData.height = overlayCanvas.height;
         clearTimeout(drawingChangeTimeout);
         drawingChangeTimeout = setTimeout(async () => {
             await saveDrawingData();
@@ -1712,51 +1747,54 @@
     }
 
     function undo() {
-        if (undoStack.length === 0) return;
-        if (undoStack.length === 1) {
-            const currentState = overlayCanvas.toDataURL();
-            redoStack.push({ dataURL: currentState, points: [], bounds: null });
-            if (redoStack.length > 50) redoStack.shift();
+        if (!currentHistory || currentHistory.undo.length === 0) return;
+        const currentState = { dataURL: overlayCanvas.toDataURL(), points: [], bounds: null };
+        if (currentHistory.undo.length === 1) {
+            currentHistory.redo.push(currentState);
+            if (currentHistory.redo.length > 50) currentHistory.redo.shift();
             overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
             sessionCanvasPages[`canvasPage_${currentPageIndex}`] = { dataURL: overlayCanvas.toDataURL() };
-            undoStack = [];
-            saveCanvasState();
+            const pageData = drawingData.pages.find(p => p.index === currentPageIndex);
+            if (pageData) pageData.dataURL = overlayCanvas.toDataURL();
+            currentHistory.undo = [];
             redrawCanvas();
+            initCurrentHistory();
             return;
         }
-        const currentState = overlayCanvas.toDataURL();
-        redoStack.push({ dataURL: currentState, points: [], bounds: null });
-        if (redoStack.length > 50) redoStack.shift();
-        const prevState = undoStack.pop();
+        currentHistory.redo.push(currentState);
+        if (currentHistory.redo.length > 50) currentHistory.redo.shift();
+        const prevState = currentHistory.undo.pop();
         const img = new Image();
         img.src = prevState.dataURL;
         img.onload = () => {
             overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
             overlayContext.drawImage(img, 0, 0, overlayCanvas.width, overlayCanvas.height);
             sessionCanvasPages[`canvasPage_${currentPageIndex}`] = { dataURL: overlayCanvas.toDataURL() };
-            saveCanvasState();
+            const pageData = drawingData.pages.find(p => p.index === currentPageIndex);
+            if (pageData) pageData.dataURL = overlayCanvas.toDataURL();
             redrawCanvas();
-            isDrawing = true;
-            isErasing = false;
-            document.getElementById('drawButton').classList.add('active');
-            document.getElementById('eraseButton').classList.remove('active');
+            clearTimeout(drawingChangeTimeout);
+            drawingChangeTimeout = setTimeout(saveDrawingData, 500);
         };
     }
 
     function redo() {
-        if (redoStack.length === 0) return;
-        const currentState = overlayCanvas.toDataURL();
-        undoStack.push({ dataURL: currentState, points: [], bounds: null });
-        if (undoStack.length > 50) undoStack.shift();
-        const nextState = redoStack.pop();
+        if (!currentHistory || currentHistory.redo.length === 0) return;
+        const currentState = { dataURL: overlayCanvas.toDataURL(), points: [], bounds: null };
+        currentHistory.undo.push(currentState);
+        if (currentHistory.undo.length > 50) currentHistory.undo.shift();
+        const nextState = currentHistory.redo.pop();
         const img = new Image();
         img.src = nextState.dataURL;
         img.onload = () => {
             overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
             overlayContext.drawImage(img, 0, 0, overlayCanvas.width, overlayCanvas.height);
             sessionCanvasPages[`canvasPage_${currentPageIndex}`] = { dataURL: overlayCanvas.toDataURL() };
-            saveCanvasState();
+            const pageData = drawingData.pages.find(p => p.index === currentPageIndex);
+            if (pageData) pageData.dataURL = overlayCanvas.toDataURL();
             redrawCanvas();
+            clearTimeout(drawingChangeTimeout);
+            drawingChangeTimeout = setTimeout(saveDrawingData, 500);
         };
     }
 
@@ -1777,7 +1815,7 @@
         if (currentPdf && currentPageIndex < pdfPageCount) {
             canvasContext.clearRect(0, 0, canvas.width, canvas.height);
             const page = await currentPdf.getPage(currentPageIndex + 1);
-            const viewport = page.getViewport({ scale: 3 });
+            const viewport = page.getViewport({ scale: liveScale });
             await page.render({
                 canvasContext: canvasContext,
                 viewport: viewport,
@@ -1813,23 +1851,15 @@
         overlayContext.lineWidth = penWidth;
         overlayContext.globalAlpha = 1;
 
-        const deltaTime = currentPoint.time - lastTime;
-        const speed = Math.sqrt(
-            Math.pow(currentPoint.x - lastPoint.x, 1) +
-            Math.pow(currentPoint.y - lastPoint.y, 1)
-        ) / (deltaTime || 1);
-        const dynamicWidth = Math.max(1, Math.min(penWidth, penWidth / (1 + speed * 0.1)));
-
         overlayContext.beginPath();
         overlayContext.moveTo(lastPoint.x, lastPoint.y);
         overlayContext.lineTo(currentPoint.x, currentPoint.y);
-        overlayContext.lineWidth = dynamicWidth;
         overlayContext.stroke();
         overlayContext.globalAlpha = 1;
     }
 
     function eraseStroke(x, y) {
-        const eraseRadius = penWidth * 15;
+        const eraseRadius = penWidth * 10;
         overlayContext.globalCompositeOperation = 'destination-out';
         overlayContext.beginPath();
         overlayContext.arc(x, y, eraseRadius, 0, Math.PI * 2);
@@ -1897,7 +1927,6 @@
     overlayCanvas.addEventListener('mouseup', (e) => {
         if (currentSection === 'drawing' && !isLocked && (isDrawing || isErasing) && strokePoints.length > 0) {
             saveCanvasState(strokePoints);
-            redoStack = [];
             strokePoints = [];
             lastPoint = null;
         }
@@ -1966,7 +1995,6 @@
             }
         } else if (currentSection === 'drawing' && !isLocked && e.changedTouches.length >= 1 && (isDrawing || isErasing) && strokePoints.length > 0) {
             saveCanvasState(strokePoints);
-            redoStack = [];
             strokePoints = [];
             lastPoint = null;
         }
@@ -1984,6 +2012,7 @@
             resizeCanvas();
         }
     });
+</script>
 </script>
 </body>
 </html>
