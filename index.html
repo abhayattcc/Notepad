@@ -1957,8 +1957,6 @@
 
         const alphaThreshold = 50;
         const colorTolerance = 30;
-        if (targetA >= alphaThreshold) return;
-
         const stack = [[x, y]];
         const visited = new Set();
         const key = (xx, yy) => `${xx},${yy}`;
@@ -1985,7 +1983,20 @@
                         const ng = data[nidx + 1];
                         const nb = data[nidx + 2];
                         const na = data[nidx + 3];
-                        if (na < alphaThreshold && Math.abs(nr - targetR) < colorTolerance && Math.abs(ng - targetG) < colorTolerance && Math.abs(nb - targetB) < colorTolerance) {
+                        let shouldFill = false;
+                        if (targetA < alphaThreshold) {
+                            if (na < alphaThreshold) {
+                                shouldFill = true;
+                            }
+                        } else {
+                            if (na >= alphaThreshold &&
+                                Math.abs(nr - targetR) < colorTolerance &&
+                                Math.abs(ng - targetG) < colorTolerance &&
+                                Math.abs(nb - targetB) < colorTolerance) {
+                                shouldFill = true;
+                            }
+                        }
+                        if (shouldFill) {
                             stack.push([nx, ny]);
                             visited.add(nkey);
                         }
