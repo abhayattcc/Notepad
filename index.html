@@ -149,6 +149,7 @@
         width: 100%;
         transition: opacity 0.5s ease-out;
         background-color: white;
+        opacity: 1;
     }
     #drawingCanvas.locked, #overlayCanvas.locked {
         touch-action: auto;
@@ -156,6 +157,7 @@
     #overlayCanvas {
         background: transparent;
         z-index: 1;
+        opacity: 1;
     }
     .pen-options {
         display: flex;
@@ -1906,6 +1908,7 @@
     }
 
     function drawShape(sx, sy, ex, ey, shape) {
+        overlayContext.globalAlpha = 1;
         overlayContext.strokeStyle = penColor;
         overlayContext.lineWidth = penWidth;
         overlayContext.lineCap = 'round';
@@ -1943,6 +1946,7 @@
     }
 
     function fillBucket(e) {
+        overlayContext.globalAlpha = 1;
         const point = getCoordinates(e);
         const x = Math.floor(point.x);
         const y = Math.floor(point.y);
@@ -2014,6 +2018,7 @@
     function drawStroke(currentPoint) {
         if (!lastPoint) return;
 
+        overlayContext.globalAlpha = 1;
         overlayContext.lineCap = 'round';
         overlayContext.lineJoin = 'round';
         overlayContext.strokeStyle = penColor;
@@ -2028,6 +2033,7 @@
     }
 
     function eraseStroke(x, y) {
+        overlayContext.globalAlpha = 1;
         const eraseRadius = penWidth * 10;
         overlayContext.globalCompositeOperation = 'destination-out';
         overlayContext.beginPath();
