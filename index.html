@@ -397,15 +397,19 @@
     let drawingData = { id: 'current', pages: [], pdfId: null, pageCount: 0 };
     let pageHistories = {};
     let currentHistory = null;
-    let liveScale = 1;
     let exportScale = 2;
-    const MAX_DIM = 4096; // Maximum dimension for PDF rendering to handle large PDFs
+    const MAX_PHYSICAL = 4096; // Maximum physical dimension for PDF rendering to handle large PDFs
+    let currentDpr = 1;
+    let tempCanvas = null;
+    let tempCtx = null;
 
     // Initialize canvases
     const canvas = document.getElementById('drawingCanvas');
     const overlayCanvas = document.getElementById('overlayCanvas');
     canvasContext = canvas.getContext('2d', { willReadFrequently: true });
     overlayContext = overlayCanvas.getContext('2d', { willReadFrequently: true });
+    tempCanvas = document.createElement('canvas');
+    tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
     canvasPages = [document.createElement('canvas')];
     sessionCanvasPages[`canvasPage_0`] = { dataURL: null };
     currentPageIndex = 0;
@@ -738,23 +742,6 @@
                         });
                         currentPdf = await loadingTask.promise;
                         pdfPageCount = drawingData.pageCount;
-
-                        // Compute liveScale for large PDFs
-                        let minScale = 1;
-                        for (let i = 1; i <= pdfPageCount; i++) {
-                            const page = await currentPdf.getPage(i);
-                            const unscaledVp = page.getViewport({ scale: 1 });
-                            const s = MAX_DIM / Math.max(unscaledVp.width, unscaledVp.height);
-                            minScale = Math.min(minScale, s);
-                        }
-                        liveScale = minScale;
-
-                        // Render PDF pages to canvasPages
-                        const renderPromises = [];
-                        for (let i = 0; i < pdfPageCount; i++) {
-                            renderPromises.push(renderPdfToCanvas(i));
-                        }
-                        await Promise.all(renderPromises);
                     }
                 }
 
@@ -769,7 +756,6 @@
                 }
                 if (totalPages > 0) {
                     selector.value = 1;
-                    await renderPage(1);
                 }
             } else {
                 // Default initial drawing
@@ -783,13 +769,19 @@
     }
 
     async function renderPdfToCanvas(index) {
-        const page = await currentPdf.getPage(index + 1);
-        const unscaledViewport = page.getViewport({ scale: 1 });
-        let scale = liveScale;
-        if (Math.max(unscaledViewport.width, unscaledViewport.height) > MAX_DIM) {
-            scale = Math.min(liveScale, MAX_DIM / Math.max(unscaledViewport.width, unscaledViewport.height));
-        }
-        const viewport = page.getViewport({ scale: scale });
+        if (!currentPdf) return;
+        const pageNum = index + 1;
+        const page = await currentPdf.getPage(pageNum);
+        const unscaledVp = page.getViewport({ scale: 1 });
+        const content = document.querySelector('.content');
+        const cssW = content.offsetWidth;
+        const cssH = content.offsetHeight;
+        if (cssW === 0 || cssH === 0) return; // Defer if not sized
+        const dpr = window.devicePixelRatio || 1;
+        const fitScale = Math.min(cssW / unscaledVp.width, cssH / unscaledVp.height);
+        let renderScale = fitScale * dpr;
+        renderScale = Math.min(renderScale, MAX_PHYSICAL / Math.max(unscaledVp.width, unscaledVp.height));
+        const viewport = page.getViewport({ scale: renderScale });
         const c = canvasPages[index];
         c.width = viewport.width;
         c.height = viewport.height;
@@ -1373,16 +1365,6 @@
                     pdfPageCount = currentPdf.numPages;
                     updateProgress(1, totalSteps);
 
-                    // Compute liveScale for large PDFs
-                    let minScale = 1;
-                    for (let i = 1; i <= pdfPageCount; i++) {
-                        const page = await currentPdf.getPage(i);
-                        const unscaledVp = page.getViewport({ scale: 1 });
-                        const s = MAX_DIM / Math.max(unscaledVp.width, unscaledVp.height);
-                        minScale = Math.min(minScale, s);
-                    }
-                    liveScale = minScale;
-
                     let textContent = '';
                     for (let i = 1; i <= pdfPageCount; i++) {
                         const page = await currentPdf.getPage(i);
@@ -1428,7 +1410,7 @@
                         document.getElementById('drawingCanvas').classList.add('locked');
                         document.getElementById('overlayCanvas').classList.add('locked');
                         showSection('drawing');
-                        await renderPage(1);
+                        setTimeout(() => renderPage(1), 0);
                     }
                 } catch (err) {
                     console.error('PDF loading failed:', err);
@@ -1467,42 +1449,26 @@
 
     async function renderPage(pageNum) {
         currentPageIndex = pageNum - 1;
-        const content = document.querySelector('.content');
-        let imgWidth = content.offsetWidth;
-        let imgHeight = content.offsetHeight;
+        await resizeCanvas();
+        const physicalW = canvas.width;
+        const physicalH = canvas.height;
 
         if (currentPdf && currentPageIndex < pdfPageCount) {
-            const page = await currentPdf.getPage(pageNum);
-            const unscaledViewport = page.getViewport({ scale: 1 });
-            let scale = liveScale;
-            if (Math.max(unscaledViewport.width, unscaledViewport.height) > MAX_DIM) {
-                scale = Math.min(liveScale, MAX_DIM / Math.max(unscaledViewport.width, unscaledViewport.height));
-            }
-            const viewport = page.getViewport({ scale: scale });
-            imgWidth = viewport.width;
-            imgHeight = viewport.height;
-            canvasPages[currentPageIndex].width = imgWidth;
-            canvasPages[currentPageIndex].height = imgHeight;
-            const ctx = canvasPages[currentPageIndex].getContext('2d', { willReadFrequently: true });
-            ctx.clearRect(0, 0, imgWidth, imgHeight);
-            await page.render({
-                canvasContext: ctx,
-                viewport: viewport,
-                enableWebGL: true
-            }).promise;
+            await renderPdfToCanvas(currentPageIndex);
         } else {
-            canvasPages[currentPageIndex].width = imgWidth;
-            canvasPages[currentPageIndex].height = imgHeight;
-            const ctx = canvasPages[currentPageIndex].getContext('2d', { willReadFrequently: true });
-            drawBackground(ctx);
+            const content = document.querySelector('.content');
+            const dpr = window.devicePixelRatio || 1;
+            const cssW = content.offsetWidth;
+            const cssH = content.offsetHeight;
+            const physicalW = Math.floor(cssW * dpr);
+            const physicalH = Math.floor(cssH * dpr);
+            if (canvasPages[currentPageIndex].width !== physicalW || canvasPages[currentPageIndex].height !== physicalH) {
+                canvasPages[currentPageIndex].width = physicalW;
+                canvasPages[currentPageIndex].height = physicalH;
+                const bgCtx = canvasPages[currentPageIndex].getContext('2d', { willReadFrequently: true });
+                drawBackground(bgCtx);
+            }
         }
-
-        canvas.width = imgWidth;
-        canvas.height = imgHeight;
-        overlayCanvas.width = imgWidth;
-        overlayCanvas.height = imgHeight;
-        canvasPages[currentPageIndex].width = canvas.width;
-        canvasPages[currentPageIndex].height = canvas.height;
 
         const savedCanvas = sessionCanvasPages[`canvasPage_${currentPageIndex}`];
         if (savedCanvas && savedCanvas.dataURL) {
@@ -1510,7 +1476,7 @@
             img.src = savedCanvas.dataURL;
             img.onload = () => {
                 overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-                overlayContext.drawImage(img, 0, 0, overlayCanvas.width, overlayCanvas.height);
+                overlayContext.drawImage(img, 0, 0, physicalW, physicalH);
                 redrawCanvas();
             };
             img.onerror = () => {
@@ -1548,16 +1514,25 @@
     async function saveAsJPG() {
         saveCanvasState();
         const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = canvas.width;
-        tempCanvas.height = canvas.height;
+        const dpr = window.devicePixelRatio || 1;
+        let tempWidth = canvas.width * (exportScale / currentDpr);
+        let tempHeight = canvas.height * (exportScale / currentDpr);
+        const maxExportDim = MAX_PHYSICAL * 2;
+        if (Math.max(tempWidth, tempHeight) > maxExportDim) {
+            const ratio = maxExportDim / Math.max(tempWidth, tempHeight);
+            tempWidth *= ratio;
+            tempHeight *= ratio;
+        }
+        tempCanvas.width = tempWidth;
+        tempCanvas.height = tempHeight;
         const ctx = tempCanvas.getContext('2d');
 
         if (currentPdf && currentPageIndex < pdfPageCount) {
             const page = await currentPdf.getPage(currentPageIndex + 1);
             const unscaledViewport = page.getViewport({ scale: 1 });
-            let scale = exportScale;
-            if (Math.max(unscaledViewport.width, unscaledViewport.height) * scale > MAX_DIM * 2) {
-                scale = Math.min(exportScale, (MAX_DIM * 2) / Math.max(unscaledViewport.width, unscaledViewport.height));
+            let scale = exportScale * dpr;
+            if (Math.max(unscaledViewport.width, unscaledViewport.height) * scale > maxExportDim) {
+                scale = maxExportDim / Math.max(unscaledViewport.width, unscaledViewport.height);
             }
             const viewport = page.getViewport({ scale: scale });
             tempCanvas.width = viewport.width;
@@ -1598,10 +1573,10 @@
         for (let i = 0; i < canvasPages.length; i++) {
             if (i > 0) doc.addPage();
             const tempCanvas = document.createElement('canvas');
-            let tempWidth = canvasPages[i].width * (exportScale / liveScale);
-            let tempHeight = canvasPages[i].height * (exportScale / liveScale);
+            let tempWidth = canvasPages[i].width * (exportScale / currentDpr);
+            let tempHeight = canvasPages[i].height * (exportScale / currentDpr);
             // Cap export size
-            const maxExportDim = MAX_DIM * 2;
+            const maxExportDim = MAX_PHYSICAL * 2;
             if (Math.max(tempWidth, tempHeight) > maxExportDim) {
                 const ratio = maxExportDim / Math.max(tempWidth, tempHeight);
                 tempWidth *= ratio;
@@ -1614,7 +1589,7 @@
             if (currentPdf && i < pdfPageCount) {
                 const page = await currentPdf.getPage(i + 1);
                 const unscaledViewport = page.getViewport({ scale: 1 });
-                let scale = exportScale;
+                let scale = exportScale * currentDpr;
                 if (Math.max(unscaledViewport.width, unscaledViewport.height) * scale > maxExportDim) {
                     scale = maxExportDim / Math.max(unscaledViewport.width, unscaledViewport.height);
                 }
@@ -1661,66 +1636,66 @@
     }
 
     // Canvas Drawing
-    function resizeCanvas() {
+    async function resizeCanvas() {
         const content = document.querySelector('.content');
-        let imgWidth = content.offsetWidth;
-        let imgHeight = content.offsetHeight;
+        const dpr = window.devicePixelRatio || 1;
+        currentDpr = dpr;
+        const cssW = content.offsetWidth;
+        const cssH = content.offsetHeight;
+        const physicalW = Math.floor(cssW * dpr);
+        const physicalH = Math.floor(cssH * dpr);
+        let needsRerender = false;
 
         if (currentPdf && currentPageIndex < pdfPageCount) {
-            // For PDF pages, use the stored dimensions
-            imgWidth = canvasPages[currentPageIndex].width || imgWidth;
-            imgHeight = canvasPages[currentPageIndex].height || imgHeight;
-        }
-
-        // Only resize if dimensions have changed
-        if (canvas.width !== imgWidth || canvas.height !== imgHeight ||
-            overlayCanvas.width !== imgWidth || overlayCanvas.height !== imgHeight) {
-            canvas.width = imgWidth;
-            canvas.height = imgHeight;
-            overlayCanvas.width = imgWidth;
-            overlayCanvas.height = imgHeight;
-            canvasPages[currentPageIndex].width = imgWidth;
-            canvasPages[currentPageIndex].height = imgHeight;
-
-            // Clear the contexts
-            canvasContext.clearRect(0, 0, canvas.width, canvas.height);
-            overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-
-            // Restore the drawing from session storage
-            const savedCanvas = sessionCanvasPages[`canvasPage_${currentPageIndex}`];
-            if (savedCanvas && savedCanvas.dataURL) {
-                const img = new Image();
-                img.src = savedCanvas.dataURL;
-                img.onload = () => {
-                    overlayContext.drawImage(img, 0, 0, overlayCanvas.width, overlayCanvas.height);
-                    redrawCanvas();
-                };
-                img.onerror = () => {
-                    overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-                    redrawCanvas();
-                };
-            } else {
-                redrawCanvas();
+            await renderPdfToCanvas(currentPageIndex);
+            const bgCanvas = canvasPages[currentPageIndex];
+            if (canvas.width !== bgCanvas.width || canvas.height !== bgCanvas.height) {
+                needsRerender = true;
             }
         } else {
-            // If no resize is needed, still ensure the drawing is restored
-            const savedCanvas = sessionCanvasPages[`canvasPage_${currentPageIndex}`];
-            if (savedCanvas && savedCanvas.dataURL) {
-                const img = new Image();
-                img.src = savedCanvas.dataURL;
-                img.onload = () => {
-                    overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-                    overlayContext.drawImage(img, 0, 0, overlayCanvas.width, overlayCanvas.height);
-                    redrawCanvas();
-                };
-                img.onerror = () => {
-                    overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-                    redrawCanvas();
-                };
-            } else {
-                overlayContext.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
-                redrawCanvas();
+            const bgCanvas = canvasPages[currentPageIndex];
+            if (bgCanvas.width !== physicalW || bgCanvas.height !== physicalH) {
+                bgCanvas.width = physicalW;
+                bgCanvas.height = physicalH;
+                const bgCtx = bgCanvas.getContext('2d', { willReadFrequently: true });
+                drawBackground(bgCtx);
+                needsRerender = true;
             }
+        }
+
+        const physicalWFinal = canvasPages[currentPageIndex].width;
+        const physicalHFinal = canvasPages[currentPageIndex].height;
+
+        if (canvas.width !== physicalWFinal || canvas.height !== physicalHFinal) {
+            canvas.width = physicalWFinal;
+            canvas.height = physicalHFinal;
+            overlayCanvas.width = physicalWFinal;
+            overlayCanvas.height = physicalHFinal;
+            tempCanvas.width = physicalWFinal;
+            tempCanvas.height = physicalHFinal;
+            canvasContext.clearRect(0, 0, physicalWFinal, physicalHFinal);
+            overlayContext.clearRect(0, 0, physicalWFinal, physicalHFinal);
+            needsRerender = true;
+        }
+
+        if (needsRerender) {
+            redrawCanvas();
+        }
+
+        // Restore overlay
+        const savedCanvas = sessionCanvasPages[`canvasPage_${currentPageIndex}`];
+        if (savedCanvas && savedCanvas.dataURL) {
+            const img = new Image();
+            img.src = savedCanvas.dataURL;
+            img.onload = () => {
+                overlayContext.clearRect(0, 0, physicalWFinal, physicalHFinal);
+                overlayContext.drawImage(img, 0, 0, physicalWFinal, physicalHFinal);
+            };
+            img.onerror = () => {
+                overlayContext.clearRect(0, 0, physicalWFinal, physicalHFinal);
+            };
+        } else {
+            overlayContext.clearRect(0, 0, physicalWFinal, physicalHFinal);
         }
 
         if (currentSection === 'drawing') {
@@ -1731,12 +1706,19 @@
     async function addCanvasPage() {
         saveCanvasState();
         const content = document.querySelector('.content');
+        const dpr = window.devicePixelRatio || 1;
+        const cssW = content.offsetWidth;
+        const cssH = content.offsetHeight;
+        const physicalW = Math.floor(cssW * dpr);
+        const physicalH = Math.floor(cssH * dpr);
         const newIndex = currentPageIndex + 1;
         const newCanvas = document.createElement('canvas');
-        newCanvas.width = content.offsetWidth;
-        newCanvas.height = content.offsetHeight;
+        newCanvas.width = physicalW;
+        newCanvas.height = physicalH;
+        const newCtx = newCanvas.getContext('2d', { willReadFrequently: true });
+        drawBackground(newCtx);
         const newId = `page_${Date.now()}_${Math.floor(Math.random() * 10000)}`;
-        const newPageData = { index: newIndex, dataURL: null, width: newCanvas.width, height: newCanvas.height, id: newId };
+        const newPageData = { index: newIndex, dataURL: null, width: physicalW, height: physicalH, id: newId };
         drawingData.pages.splice(newIndex, 0, newPageData);
         canvasPages.splice(newIndex, 0, newCanvas);
         sessionCanvasPages[`canvasPage_${newIndex}`] = { dataURL: null };
@@ -1923,20 +1905,12 @@
 
     async function redrawCanvas() {
         if (canvas.width === 0 || canvas.height === 0) return;
+        const physicalW = canvas.width;
+        const physicalH = canvas.height;
+        canvasContext.clearRect(0, 0, physicalW, physicalH);
         if (currentPdf && currentPageIndex < pdfPageCount) {
-            canvasContext.clearRect(0, 0, canvas.width, canvas.height);
-            const page = await currentPdf.getPage(currentPageIndex + 1);
-            const unscaledViewport = page.getViewport({ scale: 1 });
-            let scale = liveScale;
-            if (Math.max(unscaledViewport.width, unscaledViewport.height) > MAX_DIM) {
-                scale = Math.min(liveScale, MAX_DIM / Math.max(unscaledViewport.width, unscaledViewport.height));
-            }
-            const viewport = page.getViewport({ scale: scale });
-            await page.render({
-                canvasContext: canvasContext,
-                viewport: viewport,
-                enableWebGL: true
-            }).promise;
+            const bgCanvas = canvasPages[currentPageIndex];
+            canvasContext.drawImage(bgCanvas, 0, 0, physicalW, physicalH);
         } else {
             drawBackground(canvasContext);
         }
@@ -1964,10 +1938,34 @@
         return { x, y, time: Date.now() };
     }
 
+    function drawCurrentStrokeOnTemp() {
+        tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+        if (strokePoints.length === 0) return;
+        tempCtx.strokeStyle = penColor;
+        tempCtx.lineWidth = penWidth * currentDpr;
+        tempCtx.lineCap = 'round';
+        tempCtx.lineJoin = 'round';
+        if (strokePoints.length === 1) {
+            tempCtx.beginPath();
+            tempCtx.arc(strokePoints[0].x, strokePoints[0].y, (penWidth * currentDpr) / 2, 0, 2 * Math.PI);
+            tempCtx.fillStyle = penColor;
+            tempCtx.fill();
+        } else {
+            tempCtx.beginPath();
+            tempCtx.moveTo(strokePoints[0].x, strokePoints[0].y);
+            for (let i = 0; i < strokePoints.length - 1; i++) {
+                const cpx = (strokePoints[i].x + strokePoints[i + 1].x) / 2;
+                const cpy = (strokePoints[i].y + strokePoints[i + 1].y) / 2;
+                tempCtx.quadraticCurveTo(strokePoints[i + 1].x, strokePoints[i + 1].y, cpx, cpy);
+            }
+            tempCtx.stroke();
+        }
+    }
+
     function drawShape(sx, sy, ex, ey, shape) {
         overlayContext.globalAlpha = 1;
         overlayContext.strokeStyle = penColor;
-        overlayContext.lineWidth = penWidth;
+        overlayContext.lineWidth = penWidth * currentDpr;
         overlayContext.lineCap = 'round';
         overlayContext.lineJoin = 'round';
         const dx = ex - sx;
@@ -2071,27 +2069,9 @@
         document.getElementById('bucketButton').classList.remove('active');
     }
 
-    // Smooth Drawing Logic
-    function drawStroke(currentPoint) {
-        if (!lastPoint) return;
-
-        overlayContext.globalAlpha = 1;
-        overlayContext.lineCap = 'round';
-        overlayContext.lineJoin = 'round';
-        overlayContext.strokeStyle = penColor;
-        overlayContext.lineWidth = penWidth;
-        overlayContext.globalAlpha = 1;
-
-        overlayContext.beginPath();
-        overlayContext.moveTo(lastPoint.x, lastPoint.y);
-        overlayContext.lineTo(currentPoint.x, currentPoint.y);
-        overlayContext.stroke();
-        overlayContext.globalAlpha = 1;
-    }
-
     function eraseStroke(x, y) {
         overlayContext.globalAlpha = 1;
-        const eraseRadius = penWidth * 10;
+        const eraseRadius = penWidth * currentDpr * 10;
         overlayContext.globalCompositeOperation = 'destination-out';
         overlayContext.beginPath();
         overlayContext.arc(x, y, eraseRadius, 0, Math.PI * 2);
@@ -2105,9 +2085,8 @@
         strokePoints.push(point);
 
         if (isDrawing) {
-            point.color = penColor;
-            point.width = penWidth;
-            drawStroke(point);
+            drawCurrentStrokeOnTemp();
+            overlayContext.drawImage(tempCanvas, 0, 0);
             lastPoint = point;
             lastTime = point.time;
         } else if (isErasing) {
@@ -2133,6 +2112,9 @@
                     lastPoint = getCoordinates(e);
                     lastTime = lastPoint.time;
                     strokePoints = [lastPoint];
+                    tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+                    drawCurrentStrokeOnTemp();
+                    overlayContext.drawImage(tempCanvas, 0, 0);
                 } else if (isErasing) {
                     const point = getCoordinates(e);
                     strokePoints = [point];
@@ -2175,10 +2157,14 @@
 
     overlayCanvas.addEventListener('mouseup', (e) => {
         if (currentSection === 'drawing' && !isLocked) {
-            if (!isBucket && !currentShape && (isDrawing || isErasing) && strokePoints.length > 0) {
+            if (!isBucket && !currentShape && isDrawing && strokePoints.length > 0) {
+                overlayContext.drawImage(tempCanvas, 0, 0);
                 saveCanvasState(strokePoints);
                 strokePoints = [];
                 lastPoint = null;
+            }
+            if (isErasing && strokePoints.length > 0) {
+                strokePoints = [];
             }
             if (currentShape && shapeStartX !== undefined && e.button === 0) {
                 overlayContext.putImageData(shapeSavedData, 0, 0);
@@ -2223,6 +2209,9 @@
                         lastPoint = getCoordinates(e);
                         lastTime = lastPoint.time;
                         strokePoints = [lastPoint];
+                        tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+                        drawCurrentStrokeOnTemp();
+                        overlayContext.drawImage(tempCanvas, 0, 0);
                     }
                 } else if (e.touches.length === 2) {
                     isErasing = true;
@@ -2233,7 +2222,7 @@
                     strokePoints = [point];
                     eraseStroke(point.x, point.y);
                 } else if (e.touches.length === 4) {
-                    penColor = '#' + Math.floor(Math.random() * 16777215).toString(16);
+                    penColor = '#' + Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
                     setPenColor(penColor);
                     isDrawing = true;
                     isErasing = false;
@@ -2243,6 +2232,9 @@
                     lastPoint = point;
                     lastTime = point.time;
                     strokePoints = [point];
+                    tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
+                    drawCurrentStrokeOnTemp();
+                    overlayContext.drawImage(tempCanvas, 0, 0);
                 } else if (e.touches.length === 3) {
                     undo();
                     e.preventDefault();
@@ -2284,10 +2276,16 @@
                     nextPage();
                 }
             }
-        } else if (currentSection === 'drawing' && !isLocked && !isBucket && !currentShape && e.changedTouches.length >= 1 && (isDrawing || isErasing) && strokePoints.length > 0) {
-            saveCanvasState(strokePoints);
-            strokePoints = [];
-            lastPoint = null;
+        } else if (currentSection === 'drawing' && !isLocked && !isBucket && !currentShape && e.changedTouches.length >= 1) {
+            if (isDrawing && strokePoints.length > 0) {
+                overlayContext.drawImage(tempCanvas, 0, 0);
+                saveCanvasState(strokePoints);
+                strokePoints = [];
+                lastPoint = null;
+            }
+            if (isErasing && strokePoints.length > 0) {
+                strokePoints = [];
+            }
         }
         if (currentShape && shapeStartX !== undefined && e.changedTouches.length === 1 && !isLocked) {
             overlayContext.putImageData(shapeSavedData, 0, 0);
