@@ -397,8 +397,9 @@
     let drawingData = { id: 'current', pages: [], pdfId: null, pageCount: 0 };
     let pageHistories = {};
     let currentHistory = null;
-    let liveScale = 2;
-    let exportScale = 3;
+    let liveScale = 1;
+    let exportScale = 2;
+    const MAX_DIM = 4096; // Maximum dimension for PDF rendering to handle large PDFs
 
     // Initialize canvases
     const canvas = document.getElementById('drawingCanvas');
@@ -728,15 +729,25 @@
                         const arrayBuffer = await blob.arrayBuffer();
                         const loadingTask = pdfjsLib.getDocument({
                             data: arrayBuffer,
-                            disableAutoFetch: true,
-                            disableStream: true,
+                            disableAutoFetch: false,
+                            disableStream: false,
                             disableFontFace: true,
                             nativeImageDecoderSupport: 'decode',
-                            maxImageSize: 1024 * 1024,
+                            maxImageSize: 65536 * 65536, // Increased for larger PDFs
                             isEvalSupported: false
                         });
                         currentPdf = await loadingTask.promise;
                         pdfPageCount = drawingData.pageCount;
+
+                        // Compute liveScale for large PDFs
+                        let minScale = 1;
+                        for (let i = 1; i <= pdfPageCount; i++) {
+                            const page = await currentPdf.getPage(i);
+                            const unscaledVp = page.getViewport({ scale: 1 });
+                            const s = MAX_DIM / Math.max(unscaledVp.width, unscaledVp.height);
+                            minScale = Math.min(minScale, s);
+                        }
+                        liveScale = minScale;
 
                         // Render PDF pages to canvasPages
                         const renderPromises = [];
@@ -773,7 +784,12 @@
 
     async function renderPdfToCanvas(index) {
         const page = await currentPdf.getPage(index + 1);
-        const viewport = page.getViewport({ scale: liveScale });
+        const unscaledViewport = page.getViewport({ scale: 1 });
+        let scale = liveScale;
+        if (Math.max(unscaledViewport.width, unscaledViewport.height) > MAX_DIM) {
+            scale = Math.min(liveScale, MAX_DIM / Math.max(unscaledViewport.width, unscaledViewport.height));
+        }
+        const viewport = page.getViewport({ scale: scale });
         const c = canvasPages[index];
         c.width = viewport.width;
         c.height = viewport.height;
@@ -979,6 +995,8 @@
                     content.classList.remove('fullscreen');
                 }
                 showSection('drawing');
+                // Fix glitch: Resize canvas after collapse/expand
+                setTimeout(() => resizeCanvas(), 100);
             } else {
                 isDrawingCollapsed = false;
                 isTextCollapsed = false;
@@ -1325,11 +1343,11 @@
                     const arrayBuffer = await file.arrayBuffer();
                     const loadingTask = pdfjsLib.getDocument({
                         data: arrayBuffer,
-                        disableAutoFetch: true,
-                        disableStream: true,
+                        disableAutoFetch: false,
+                        disableStream: false,
                         disableFontFace: true,
                         nativeImageDecoderSupport: 'decode',
-                        maxImageSize: 1024 * 1024,
+                        maxImageSize: 65536 * 65536, // Increased for larger PDFs
                         isEvalSupported: false
                     });
 
@@ -1354,6 +1372,16 @@
                     currentPdf = await loadingTask.promise;
                     pdfPageCount = currentPdf.numPages;
                     updateProgress(1, totalSteps);
+
+                    // Compute liveScale for large PDFs
+                    let minScale = 1;
+                    for (let i = 1; i <= pdfPageCount; i++) {
+                        const page = await currentPdf.getPage(i);
+                        const unscaledVp = page.getViewport({ scale: 1 });
+                        const s = MAX_DIM / Math.max(unscaledVp.width, unscaledVp.height);
+                        minScale = Math.min(minScale, s);
+                    }
+                    liveScale = minScale;
 
                     let textContent = '';
                     for (let i = 1; i <= pdfPageCount; i++) {
@@ -1445,7 +1473,12 @@
 
         if (currentPdf && currentPageIndex < pdfPageCount) {
             const page = await currentPdf.getPage(pageNum);
-            const viewport = page.getViewport({ scale: liveScale });
+            const unscaledViewport = page.getViewport({ scale: 1 });
+            let scale = liveScale;
+            if (Math.max(unscaledViewport.width, unscaledViewport.height) > MAX_DIM) {
+                scale = Math.min(liveScale, MAX_DIM / Math.max(unscaledViewport.width, unscaledViewport.height));
+            }
+            const viewport = page.getViewport({ scale: scale });
             imgWidth = viewport.width;
             imgHeight = viewport.height;
             canvasPages[currentPageIndex].width = imgWidth;
@@ -1521,7 +1554,12 @@
 
         if (currentPdf && currentPageIndex < pdfPageCount) {
             const page = await currentPdf.getPage(currentPageIndex + 1);
-            const viewport = page.getViewport({ scale: exportScale });
+            const unscaledViewport = page.getViewport({ scale: 1 });
+            let scale = exportScale;
+            if (Math.max(unscaledViewport.width, unscaledViewport.height) * scale > MAX_DIM * 2) {
+                scale = Math.min(exportScale, (MAX_DIM * 2) / Math.max(unscaledViewport.width, unscaledViewport.height));
+            }
+            const viewport = page.getViewport({ scale: scale });
             tempCanvas.width = viewport.width;
             tempCanvas.height = viewport.height;
             await page.render({
@@ -1560,13 +1598,27 @@
         for (let i = 0; i < canvasPages.length; i++) {
             if (i > 0) doc.addPage();
             const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = canvasPages[i].width * (exportScale / liveScale);
-            tempCanvas.height = canvasPages[i].height * (exportScale / liveScale);
+            let tempWidth = canvasPages[i].width * (exportScale / liveScale);
+            let tempHeight = canvasPages[i].height * (exportScale / liveScale);
+            // Cap export size
+            const maxExportDim = MAX_DIM * 2;
+            if (Math.max(tempWidth, tempHeight) > maxExportDim) {
+                const ratio = maxExportDim / Math.max(tempWidth, tempHeight);
+                tempWidth *= ratio;
+                tempHeight *= ratio;
+            }
+            tempCanvas.width = tempWidth;
+            tempCanvas.height = tempHeight;
             const ctx = tempCanvas.getContext('2d');
 
             if (currentPdf && i < pdfPageCount) {
                 const page = await currentPdf.getPage(i + 1);
-                const viewport = page.getViewport({ scale: exportScale });
+                const unscaledViewport = page.getViewport({ scale: 1 });
+                let scale = exportScale;
+                if (Math.max(unscaledViewport.width, unscaledViewport.height) * scale > maxExportDim) {
+                    scale = maxExportDim / Math.max(unscaledViewport.width, unscaledViewport.height);
+                }
+                const viewport = page.getViewport({ scale: scale });
                 tempCanvas.width = viewport.width;
                 tempCanvas.height = viewport.height;
                 await page.render({
@@ -1874,7 +1926,12 @@
         if (currentPdf && currentPageIndex < pdfPageCount) {
             canvasContext.clearRect(0, 0, canvas.width, canvas.height);
             const page = await currentPdf.getPage(currentPageIndex + 1);
-            const viewport = page.getViewport({ scale: liveScale });
+            const unscaledViewport = page.getViewport({ scale: 1 });
+            let scale = liveScale;
+            if (Math.max(unscaledViewport.width, unscaledViewport.height) > MAX_DIM) {
+                scale = Math.min(liveScale, MAX_DIM / Math.max(unscaledViewport.width, unscaledViewport.height));
+            }
+            const viewport = page.getViewport({ scale: scale });
             await page.render({
                 canvasContext: canvasContext,
                 viewport: viewport,
@@ -2139,7 +2196,12 @@
 
     overlayCanvas.addEventListener('touchstart', (e) => {
         if (currentSection === 'drawing') {
-            if (isLocked && e.touches.length === 1) {
+            if (e.touches.length >= 5) {
+                // 5+ finger touch to toggle lock
+                toggleLock();
+                e.preventDefault();
+                return;
+            } else if (isLocked && e.touches.length === 1) {
                 touchStartX = e.touches[0].clientX;
                 touchStartY = e.touches[0].clientY;
             } else if (!isLocked) {
