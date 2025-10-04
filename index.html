@@ -292,7 +292,6 @@
     </div>
     <div class="toolbar" id="toolbar">
         <div class="toolbar-group" id="textTools">
-            <button title="guide" onclick="undoText()">🤔</button>
             <button title="Undo" onclick="undoText()">↺</button>
             <button title="Redo" onclick="redoText()">↻</button>
             <button title="Find and Replace" onclick="findAndReplace()">🔎</button>
@@ -307,6 +306,7 @@
             <button title="Open File" onclick="openFile()">📜</button>
             <button title="Export Text" onclick="exportText()">📤</button>
             <button title="Support Us" onclick="supportUs()">💰</button>
+            <button title="Help" onclick="openGuide()">🤔</button>
         </div>
         <div class="toolbar-group hidden" id="drawingTools">
             <button title="Toggle Drawing" id="drawButton" onclick="toggleDrawing()">✍️</button>
@@ -452,6 +452,11 @@
     // Support Us function
     function supportUs() {
         window.open('upi://pay?pa=9348692218-3@ibl&pn=ABHAYA%20%20BEHERA&mc=0000&mode=02&purpose=00');
+    }
+
+    // Guide function
+    function openGuide() {
+        window.open('https://abhayattcc.github.io/Notepadguide/');
     }
 
     // IndexedDB Setup
