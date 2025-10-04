@@ -100,6 +100,7 @@
         width: 100%;
         overflow: auto;
         position: relative;
+        background-color: white;
     }
     .content.fullscreen {
         padding: 0;
@@ -304,6 +305,7 @@
             <button title="Permanently Delete" onclick="permanentlyDelete()">🗑️🚫</button>
             <button title="Open File" onclick="openFile()">📜</button>
             <button title="Export Text" onclick="exportText()">📤</button>
+            <button title="Support Us" onclick="supportUs()">💰</button>
         </div>
         <div class="toolbar-group hidden" id="drawingTools">
             <button title="Toggle Drawing" id="drawButton" onclick="toggleDrawing()">✍️</button>
@@ -448,6 +450,11 @@
     document.querySelectorAll('.toolbar button, .page-controls button, .back-button, .view-trash-button').forEach(button => {
         button.addEventListener('click', () => showTooltip(button));
     });
+
+    // Support Us function
+    function supportUs() {
+        window.open('upi://pay?pa=9348692218-3@ibl&pn=ABHAYA%20%20BEHERA&mc=0000&mode=02&purpose=00', '_blank');
+    }
 
     // IndexedDB Setup
     const DB_NAME = 'KidsNotepadDB';
@@ -778,15 +785,18 @@
         const cssH = content.offsetHeight;
         if (cssW === 0 || cssH === 0) return; // Defer if not sized
         const dpr = window.devicePixelRatio || 1;
-        const fitScale = Math.min(cssW / unscaledVp.width, cssH / unscaledVp.height);
-        let renderScale = fitScale * dpr;
+        const scale = cssW / unscaledVp.width; // Fit to width
+        let renderScale = scale * dpr;
         renderScale = Math.min(renderScale, MAX_PHYSICAL / Math.max(unscaledVp.width, unscaledVp.height));
         const viewport = page.getViewport({ scale: renderScale });
+        const physicalW = Math.floor(cssW * dpr);
+        const physicalH = Math.floor(cssH * dpr);
         const c = canvasPages[index];
-        c.width = viewport.width;
-        c.height = viewport.height;
+        c.width = physicalW;
+        c.height = physicalH;
         const ctx = c.getContext('2d', { willReadFrequently: true });
-        ctx.clearRect(0, 0, c.width, c.height);
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, physicalW, physicalH);
         await page.render({
             canvasContext: ctx,
             viewport: viewport,
@@ -1681,6 +1691,21 @@
         if (needsRerender) {
             redrawCanvas();
         }
+
+        // Set display size and positioning to avoid stretching and align to top
+        const displayW = physicalWFinal / currentDpr;
+        const displayH = physicalHFinal / currentDpr;
+        canvas.style.width = displayW + 'px';
+        canvas.style.height = displayH + 'px';
+        overlayCanvas.style.width = displayW + 'px';
+        overlayCanvas.style.height = displayH + 'px';
+
+        canvas.style.left = '50%';
+        canvas.style.top = '0%';
+        canvas.style.transform = 'translateX(-50%)';
+        overlayCanvas.style.left = '50%';
+        overlayCanvas.style.top = '0%';
+        overlayCanvas.style.transform = 'translateX(-50%)';
 
         // Restore overlay
         const savedCanvas = sessionCanvasPages[`canvasPage_${currentPageIndex}`];
