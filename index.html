@@ -292,6 +292,7 @@
     </div>
     <div class="toolbar" id="toolbar">
         <div class="toolbar-group" id="textTools">
+            <button title="guide" onclick="undoText()">🤔</button>
             <button title="Undo" onclick="undoText()">↺</button>
             <button title="Redo" onclick="redoText()">↻</button>
             <button title="Find and Replace" onclick="findAndReplace()">🔎</button>
@@ -315,9 +316,6 @@
             <button title="Reset Position" onclick="resetPosition()">🔄</button>
             <button title="New Page" onclick="newCanvasPage()">➕</button>
             <button title="Clear Current Page" onclick="clearCurrentPage()">🗑️</button>
-            <button title="Circle" onclick="startShape('circle')">⭕</button>
-            <button title="Rectangle" onclick="startShape('rect')">⬜</button>
-            <button title="Triangle" onclick="startShape('triangle')">🔺</button>
             <button title="Undo" onclick="undo()">↺</button>
             <button title="Redo" onclick="redo()">↻</button>
             <button title="Save as JPG" onclick="saveAsJPG()">🖼️</button>
@@ -453,7 +451,7 @@
 
     // Support Us function
     function supportUs() {
-        window.open('upi://pay?pa=9348692218-3@ibl&pn=ABHAYA%20%20BEHERA&mc=0000&mode=02&purpose=00', '_blank');
+        window.open('upi://pay?pa=9348692218-3@ibl&pn=ABHAYA%20%20BEHERA&mc=0000&mode=02&purpose=00');
     }
 
     // IndexedDB Setup
@@ -821,6 +819,36 @@
         if (currentHistory.undo.length === 0) {
             currentHistory.undo.push({ dataURL: overlayCanvas.toDataURL(), points: [], bounds: null });
         }
+    }
+
+    // Smooth Bezier curve drawing function
+    function drawSmoothCurve(ctx, points) {
+        if (points.length === 1) {
+            ctx.beginPath();
+            ctx.arc(points[0].x, points[0].y, (penWidth * currentDpr) / 2, 0, 2 * Math.PI);
+            ctx.fill();
+            return;
+        }
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length - 1; i++) {
+            const p0 = points[i - 1];
+            const p1 = points[i];
+            const p2 = points[i + 1];
+            const d1x = p1.x - p0.x;
+            const d1y = p1.y - p0.y;
+            const d2x = p2.x - p1.x;
+            const d2y = p2.y - p1.y;
+            const cp1x = p1.x + d1x / 3;
+            const cp1y = p1.y + d1y / 3;
+            const cp2x = p2.x - d2x / 3;
+            const cp2y = p2.y - d2y / 3;
+            ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, p2.x, p2.y);
+        }
+        if (points.length === 2) {
+            ctx.lineTo(points[1].x, points[1].y);
+        }
+        ctx.stroke();
     }
 
     // Initialize IndexedDB and load data
@@ -1965,26 +1993,12 @@
 
     function drawCurrentStrokeOnTemp() {
         tempCtx.clearRect(0, 0, tempCanvas.width, tempCanvas.height);
-        if (strokePoints.length === 0) return;
         tempCtx.strokeStyle = penColor;
         tempCtx.lineWidth = penWidth * currentDpr;
         tempCtx.lineCap = 'round';
         tempCtx.lineJoin = 'round';
-        if (strokePoints.length === 1) {
-            tempCtx.beginPath();
-            tempCtx.arc(strokePoints[0].x, strokePoints[0].y, (penWidth * currentDpr) / 2, 0, 2 * Math.PI);
-            tempCtx.fillStyle = penColor;
-            tempCtx.fill();
-        } else {
-            tempCtx.beginPath();
-            tempCtx.moveTo(strokePoints[0].x, strokePoints[0].y);
-            for (let i = 0; i < strokePoints.length - 1; i++) {
-                const cpx = (strokePoints[i].x + strokePoints[i + 1].x) / 2;
-                const cpy = (strokePoints[i].y + strokePoints[i + 1].y) / 2;
-                tempCtx.quadraticCurveTo(strokePoints[i + 1].x, strokePoints[i + 1].y, cpx, cpy);
-            }
-            tempCtx.stroke();
-        }
+        tempCtx.fillStyle = penColor;
+        drawSmoothCurve(tempCtx, strokePoints);
     }
 
     function drawShape(sx, sy, ex, ey, shape) {
