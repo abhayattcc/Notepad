@@ -70,6 +70,12 @@
         flex-wrap: wrap;
         justify-content: center;
     }
+    .button-wrapper {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 4px;
+    }
     .toolbar button {
         background-color: #7fffd4;
         border: 2px solid #20b2aa;
@@ -90,6 +96,16 @@
     }
     .toolbar button.active {
         background-color: #20b2aa;
+    }
+    .button-label {
+        font-size: 10px;
+        text-align: center;
+        color: #333;
+        margin: 0;
+        white-space: nowrap;
+        max-width: 56px;
+        overflow: hidden;
+        text-overflow: ellipsis;
     }
     .content {
         flex: 1;
@@ -282,6 +298,64 @@
     .tooltip.show {
         opacity: 1;
     }
+    /* Popup styles */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 2000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        overflow: auto;
+        background-color: rgba(0,0,0,0.5);
+    }
+    .modal-content {
+        background-color: #f0f8ff;
+        margin: 5% auto;
+        padding: 20px;
+        border: 2px solid #ff69b4;
+        border-radius: 8px;
+        width: 90%;
+        max-width: 800px;
+        max-height: 80vh;
+        overflow-y: auto;
+        position: relative;
+    }
+    .close {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+        position: absolute;
+        right: 15px;
+        top: 10px;
+    }
+    .close:hover {
+        color: #000;
+    }
+    .lang-tabs {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+    }
+    .lang-tab {
+        padding: 8px 12px;
+        background-color: #ff69b4;
+        color: white;
+        border-radius: 4px;
+        cursor: pointer;
+    }
+    .lang-tab.active {
+        background-color: #c71585;
+    }
+    .guide-section {
+        display: none;
+    }
+    .guide-section.active {
+        display: block;
+    }
     </style>
 </head>
 <body>
@@ -292,34 +366,112 @@
     </div>
     <div class="toolbar" id="toolbar">
         <div class="toolbar-group" id="textTools">
-            <button title="Undo" onclick="undoText()">↺</button>
-            <button title="Redo" onclick="redoText()">↻</button>
-            <button title="Find and Replace" onclick="findAndReplace()">🔎</button>
-            <button title="Select All" onclick="selectAll()">📄</button>
-            <button title="Copy" onclick="copyText()">📋</button>
-            <button title="Erase Text" onclick="eraseText()">🧹</button>
-            <button title="Save Text" onclick="saveText()">💾</button>
-            <button title="Show Saved Texts" onclick="showSavedTexts()">📚</button>
-            <button title="Delete Saved Text" onclick="deleteSavedText()">🗑️</button>
-            <button title="Restore Text" onclick="restoreText()">🔄</button>
-            <button title="Permanently Delete" onclick="permanentlyDelete()">🗑️🚫</button>
-            <button title="Open File" onclick="openFile()">📜</button>
-            <button title="Export Text" onclick="exportText()">📤</button>
-            <button title="Support Us" onclick="supportUs()">💰</button>
-            <button title="Help" onclick="openGuide()">🤔</button>
+            <div class="button-wrapper">
+                <button title="Undo" onclick="undoText()">↺</button>
+                <p class="button-label">Undo</p>
+            </div>
+            <div class="button-wrapper">
+                <button title="Redo" onclick="redoText()">↻</button>
+                <p class="button-label">Redo</p>
+            </div>
+            <div class="button-wrapper">
+                <button title="Find and Replace" onclick="findAndReplace()">🔎</button>
+                <p class="button-label">Find & Replace</p>
+            </div>
+            <div class="button-wrapper">
+                <button title="Select All" onclick="selectAll()">📄</button>
+                <p class="button-label">Select All</p>
+            </div>
+            <div class="button-wrapper">
+                <button title="Copy" onclick="copyText()">📋</button>
+                <p class="button-label">Copy</p>
+            </div>
+            <div class="button-wrapper">
+                <button title="Erase Text" onclick="eraseText()">🧹</button>
+                <p class="button-label">Erase Text</p>
+            </div>
+            <div class="button-wrapper">
+                <button title="Save Text" onclick="saveText()">💾</button>
+                <p class="button-label">Save Text</p>
+            </div>
+            <div class="button-wrapper">
+                <button title="Show Saved Texts" onclick="showSavedTexts()">📚</button>
+                <p class="button-label">Saved Texts</p>
+            </div>
+            <div class="button-wrapper">
+                <button title="Delete Saved Text" onclick="deleteSavedText()">🗑️</button>
+                <p class="button-label">Delete Saved</p>
+            </div>
+            <div class="button-wrapper">
+                <button title="Restore Text" onclick="restoreText()">🔄</button>
+                <p class="button-label">Restore Text</p>
+            </div>
+            <div class="button-wrapper">
+                <button title="Permanently Delete" onclick="permanentlyDelete()">🗑️🚫</button>
+                <p class="button-label">Perm Delete</p>
+            </div>
+            <div class="button-wrapper">
+                <button title="Open File" onclick="openFile()">📜</button>
+                <p class="button-label">Open File</p>
+            </div>
+            <div class="button-wrapper">
+                <button title="Export Text" onclick="exportText()">📤</button>
+                <p class="button-label">Export Text</p>
+            </div>
+            <div class="button-wrapper">
+                <button title="Support Us" onclick="supportUs()">💰</button>
+                <p class="button-label">Support Us</p>
+            </div>
+            <div class="button-wrapper">
+                <button title="Help" onclick="showGuide()">🤔</button>
+                <p class="button-label">Help</p>
+            </div>
         </div>
         <div class="toolbar-group hidden" id="drawingTools">
-            <button title="Toggle Drawing" id="drawButton" onclick="toggleDrawing()">✍️</button>
-            <button title="Eraser" id="eraseButton" onclick="toggleErase()">🧹</button>
-            <button title="Bucket Fill" id="bucketButton" onclick="toggleBucket()">🪣</button>
-            <button title="Lock View" id="lockButton" onclick="toggleLock()">🔒</button>
-            <button title="Reset Position" onclick="resetPosition()">🔄</button>
-            <button title="New Page" onclick="newCanvasPage()">➕</button>
-            <button title="Clear Current Page" onclick="clearCurrentPage()">🗑️</button>
-            <button title="Undo" onclick="undo()">↺</button>
-            <button title="Redo" onclick="redo()">↻</button>
-            <button title="Save as JPG" onclick="saveAsJPG()">🖼️</button>
-            <button title="Share as PDF" onclick="shareAsPDF()">📄</button>
+            <div class="button-wrapper">
+                <button title="Toggle Drawing" id="drawButton" onclick="toggleDrawing()">✍️</button>
+                <p class="button-label">Draw</p>
+            </div>
+            <div class="button-wrapper">
+                <button title="Eraser" id="eraseButton" onclick="toggleErase()">🧹</button>
+                <p class="button-label">Eraser</p>
+            </div>
+            <div class="button-wrapper">
+                <button title="Bucket Fill" id="bucketButton" onclick="toggleBucket()">🪣</button>
+                <p class="button-label">Bucket Fill</p>
+            </div>
+            <div class="button-wrapper">
+                <button title="Lock View" id="lockButton" onclick="toggleLock()">🔒</button>
+                <p class="button-label">Lock View</p>
+            </div>
+            <div class="button-wrapper">
+                <button title="Reset Position" onclick="resetPosition()">🔄</button>
+                <p class="button-label">Reset Pos</p>
+            </div>
+            <div class="button-wrapper">
+                <button title="New Page" onclick="newCanvasPage()">➕</button>
+                <p class="button-label">New Page</p>
+            </div>
+            <div class="button-wrapper">
+                <button title="Clear Current Page" onclick="clearCurrentPage()">🗑️</button>
+                <p class="button-label">Clear Page</p>
+            </div>
+            <div class="button-wrapper">
+                <button title="Undo" onclick="undo()">↺</button>
+                <p class="button-label">Undo</p>
+            </div>
+            <div class="button-wrapper">
+                <button title="Redo" onclick="redo()">↻</button>
+                <p class="button-label">Redo</p>
+            </div>
+            <div class="button-wrapper">
+                <button title="Save as JPG" onclick="saveAsJPG()">🖼️</button>
+                <p class="button-label">Save JPG</p>
+            </div>
+            <div class="button-wrapper">
+                <button title="Share as PDF" onclick="shareAsPDF()">📄</button>
+                <p class="button-label">Share PDF</p>
+            </div>
             <div class="pen-options">
                 <select id="penWidth" onchange="setPenWidth(this.value)">
                     <option value="3">normal</option>
@@ -342,9 +494,15 @@
                 <input type="color" id="colorPicker" value="#0000ff" onchange="setPenColor(this.value)">
             </div>
             <div class="page-controls">
-                <button title="Previous Page" onclick="previousPage()">Previous</button>
+                <div class="button-wrapper">
+                    <button title="Previous Page" onclick="previousPage()">Previous</button>
+                    <p class="button-label">Previous</p>
+                </div>
                 <select id="pageSelector" onchange="saveCanvasState(); renderPage(this.value)"></select>
-                <button title="Next Page" onclick="nextPage()">Next</button>
+                <div class="button-wrapper">
+                    <button title="Next Page" onclick="nextPage()">Next</button>
+                    <p class="button-label">Next</p>
+                </div>
             </div>
         </div>
     </div>
@@ -361,6 +519,146 @@
         </div>
     </div>
 </div>
+
+<!-- Guide Popup -->
+<div id="guideModal" class="modal">
+    <div class="modal-content">
+        <span class="close" onclick="closeGuide()">&times;</span>
+        <h2>Kids Notepad Help Guide</h2>
+        <div class="lang-tabs">
+            <div class="lang-tab active" onclick="switchLang('en')">English</div>
+            <div class="lang-tab" onclick="switchLang('hi')">हिंदी</div>
+            <div class="lang-tab" onclick="switchLang('or')">ଓଡ଼ିଆ</div>
+        </div>
+        <div id="guide-en" class="guide-section active">
+            <h3>Text Writing Section (Write Tab)</h3>
+            <ul>
+                <li><strong>Undo:</strong> Revert the last text change.</li>
+                <li><strong>Redo:</strong> Redo the last undone action.</li>
+                <li><strong>Find & Replace:</strong> Search for text and replace it.</li>
+                <li><strong>Select All:</strong> Select entire text.</li>
+                <li><strong>Copy:</strong> Copy selected text to clipboard.</li>
+                <li><strong>Erase Text:</strong> Clear all text.</li>
+                <li><strong>Save Text:</strong> Save current text with a unique ID.</li>
+                <li><strong>Saved Texts:</strong> View and load saved texts.</li>
+                <li><strong>Delete Saved:</strong> Move saved text to trash.</li>
+                <li><strong>Restore Text:</strong> Restore from trash (within 60 days).</li>
+                <li><strong>Perm Delete:</strong> Permanently delete from trash.</li>
+                <li><strong>Open File:</strong> Load TXT or PDF (text extract or draw mode).</li>
+                <li><strong>Export Text:</strong> Download current text as TXT.</li>
+                <li><strong>Support Us:</strong> Donate via UPI.</li>
+            </ul>
+            <h3>Drawing Section (Draw Tab)</h3>
+            <ul>
+                <li><strong>Draw:</strong> Toggle drawing mode (smooth curves).</li>
+                <li><strong>Eraser:</strong> Toggle eraser (right-click or 2-finger touch).</li>
+                <li><strong>Bucket Fill:</strong> Fill areas with selected color.</li>
+                <li><strong>Lock View:</strong> Lock drawing (5-finger touch toggle).</li>
+                <li><strong>Reset Pos:</strong> Reset canvas position.</li>
+                <li><strong>New Page:</strong> Add a new drawing page.</li>
+                <li><strong>Clear Page:</strong> Clear current page (removes empty pages).</li>
+                <li><strong>Undo/Redo:</strong> Undo/redo drawing actions.</li>
+                <li><strong>Save JPG:</strong> Export current page as JPG.</li>
+                <li><strong>Share PDF:</strong> Export all pages as PDF.</li>
+                <li><strong>Pen Width:</strong> Select line thickness.</li>
+                <li><strong>Pen Color:</strong> Select color from dropdown or picker.</li>
+                <li><strong>Page Controls:</strong> Navigate pages (swipe in lock mode).</li>
+                <li><strong>Multi-Touch:</strong> 1-finger: draw; 2-finger: erase; 3-finger: undo; 4-finger: random color.</li>
+            </ul>
+            <h3>General</h3>
+            <ul>
+                <li>Switch tabs to alternate between text and drawing.</li>
+                <li>Collapse sections by tapping the active tab again.</li>
+                <li>Data saved automatically in browser storage.</li>
+            </ul>
+        </div>
+        <div id="guide-hi" class="guide-section">
+            <h3>पाठ लेखन अनुभाग (लिखें टैब)</h3>
+            <ul>
+                <li><strong>पूर्ववत:</strong> अंतिम पाठ परिवर्तन को पूर्ववत करें।</li>
+                <li><strong>पुनः करें:</strong> अंतिम पूर्ववत क्रिया को दोहराएं।</li>
+                <li><strong>खोजें और बदलें:</strong> पाठ खोजें और बदलें।</li>
+                <li><strong>सभी चुनें:</strong> पूरा पाठ चुनें।</li>
+                <li><strong>कॉपी:</strong> चयनित पाठ को क्लिपबोर्ड पर कॉपी करें।</li>
+                <li><strong>पाठ मिटाएं:</strong> सभी पाठ साफ करें।</li>
+                <li><strong>पाठ सहेजें:</strong> वर्तमान पाठ को अद्वितीय आईडी के साथ सहेजें।</li>
+                <li><strong>सहेजे गए पाठ:</strong> सहेजे गए पाठ देखें और लोड करें।</li>
+                <li><strong>सहेजा गया हटाएं:</strong> सहेजे गए पाठ को कचरे में ले जाएं।</li>
+                <li><strong>पाठ पुनर्स्थापित करें:</strong> कचरे से पुनर्स्थापित करें (60 दिनों के अंदर)।</li>
+                <li><strong>स्थायी हटाएं:</strong> कचरे से स्थायी रूप से हटाएं।</li>
+                <li><strong>फ़ाइल खोलें:</strong> TXT या PDF लोड करें (पाठ निकालें या ड्रॉ मोड)।</li>
+                <li><strong>पाठ निर्यात करें:</strong> वर्तमान पाठ को TXT के रूप में डाउनलोड करें।</li>
+                <li><strong>हमारा समर्थन करें:</strong> UPI के माध्यम से दान करें।</li>
+            </ul>
+            <h3>ड्राइंग अनुभाग (ड्रॉ टैब)</h3>
+            <ul>
+                <li><strong>ड्रॉ:</strong> ड्राइंग मोड टॉगल करें (स्मूथ कर्व्स)।</li>
+                <li><strong>रबर:</strong> रबर टॉगल करें (राइट-क्लिक या 2-उंगली टच)।</li>
+                <li><strong>बकेट फिल:</strong> क्षेत्रों को चयनित रंग से भरें।</li>
+                <li><strong>लॉक व्यू:</strong> ड्राइंग लॉक करें (5-उंगली टच टॉगल)।</li>
+                <li><strong>रीसेट पोज:</strong> कैनवास स्थिति रीसेट करें।</li>
+                <li><strong>नया पेज:</strong> नया ड्राइंग पेज जोड़ें।</li>
+                <li><strong>पेज साफ करें:</strong> वर्तमान पेज साफ करें (खाली पेज हटाएं)।</li>
+                <li><strong>पूर्ववत/पुनः करें:</strong> ड्राइंग क्रियाओं को पूर्ववत/दोहराएं।</li>
+                <li><strong>JPG सहेजें:</strong> वर्तमान पेज को JPG के रूप में निर्यात करें।</li>
+                <li><strong>PDF शेयर करें:</strong> सभी पेजों को PDF के रूप में निर्यात करें।</li>
+                <li><strong>पेन चौड़ाई:</strong> लाइन मोटाई चुनें।</li>
+                <li><strong>पेन रंग:</strong> ड्रॉपडाउन या पिकर से रंग चुनें।</li>
+                <li><strong>पेज नियंत्रण:</strong> पेज नेविगेट करें (लॉक मोड में स्वाइप)।</li>
+                <li><strong>मल्टी-टच:</strong> 1-उंगली: ड्रॉ; 2-उंगली: मिटाएं; 3-उंगली: पूर्ववत; 4-उंगली: रैंडम रंग।</li>
+            </ul>
+            <h3>सामान्य</h3>
+            <ul>
+                <li>टैब स्विच करके पाठ और ड्राइंग के बीच वैकल्पिक करें।</li>
+                <li>सक्रिय टैब पर दोबारा टैप करके अनुभागों को संकुचित करें।</li>
+                <li>डेटा स्वचालित रूप से ब्राउज़र स्टोरेज में सहेजा जाता है।</li>
+            </ul>
+        </div>
+        <div id="guide-or" class="guide-section">
+            <h3>ପାଠ ଲେଖନ ଅଂଶ (ଲେଖନ ଟ୍ୟାବ୍)</h3>
+            <ul>
+                <li><strong>ପୂର୍ବବର୍ତ୍ତୀ:</strong> ଶେଷ ପାଠ ପରିବର୍ତ୍ତନକୁ ପୁନରୁଦ୍ଧାରଣ କରନ୍ତୁ।</li>
+                <li><strong>ପୁନର୍ବାର:</strong> ଶେଷ ପୂର୍ବବର୍ତ୍ତୀ କାର୍ଯ୍ୟକୁ ପୁନରାବୃତ୍ତି କରନ୍ତୁ।</li>
+                <li><strong>ଖୋଜିବା ଓ ପରିବର୍ତ୍ତନ:</strong> ପାଠ ଖୋଜନ୍ତୁ ଓ ପରିବର୍ତ୍ତନ କରନ୍ତୁ।</li>
+                <li><strong>ସବୁ ଚୟନ:</strong> ପୂରା ପାଠ ଚୟନ କରନ୍ତୁ।</li>
+                <li><strong>କପି:</strong> ଚୟନିତ ପାଠକୁ କ୍ଲିପବୋର୍ଡକୁ କପି କରନ୍ତୁ।</li>
+                <li><strong>ପାଠ ମାରିବା:</strong> ସବୁ ପାଠ ସଫା କରନ୍ତୁ।</li>
+                <li><strong>ପାଠ ସଂରକ୍ଷଣ:</strong> ବର୍ତ୍ତମାନର ପାଠକୁ ଏକ ଅନନ୍ୟ ଆଇଡି ସହିତ ସଂରକ୍ଷଣ କରନ୍ତୁ।</li>
+                <li><strong>ସଂରକ୍ଷିତ ପାଠ:</strong> ସଂରକ୍ଷିତ ପାଠ ଦେଖନ୍ତୁ ଓ ଲୋଡ୍ କରନ୍ତୁ।</li>
+                <li><strong>ସଂରକ୍ଷିତ ହରାଇବା:</strong> ସଂରକ୍ଷିତ ପାଠକୁ କୁଆରକୁ ପଠାନ୍ତୁ।</li>
+                <li><strong>ପାଠ ପୁନରୁଦ୍ଧାରଣ:</strong> କୁଆରରୁ ପୁନରୁଦ୍ଧାରଣ କରନ୍ତୁ (60 ଦିନ ଭିତରେ)।</li>
+                <li><strong>ସ୍ଥାୟୀ ହରାଇବା:</strong> କୁଆରରୁ ସ୍ଥାୟୀ ଭାବେ ହରାନ୍ତୁ।</li>
+                <li><strong>ଫାଇଲ୍ ଖୋଲନ୍ତୁ:</strong> TXT କିମ୍ବା PDF ଲୋଡ୍ କରନ୍ତୁ (ପାଠ ନିଷ୍କାସନ କିମ୍ବା ଡ୍ରଅ ମୋଡ୍)।</li>
+                <li><strong>ପାଠ ନିର୍ଯ୍ୟାସ:</strong> ବର୍ତ୍ତମାନର ପାଠକୁ TXT ଆକାରରେ ଡାଉନଲୋଡ୍ କରନ୍ତୁ।</li>
+                <li><strong>ଆମକୁ ସହାୟତା କରନ୍ତୁ:</strong> UPI ମାଧ୍ୟମରେ ଦାନ କରନ୍ତୁ।</li>
+            </ul>
+            <h3>ଚିତ୍ରକଳା ଅଂଶ (ଡ୍ରଅ ଟ୍ୟାବ୍)</h3>
+            <ul>
+                <li><strong>ଡ୍ରଅ:</strong> ଚିତ୍ରକଳା ମୋଡ୍ ଟଗଲ୍ କରନ୍ତୁ (ସ୍ମୁଥ୍ କର୍ଭ୍)।</li>
+                <li><strong>ରବର୍:</strong> ରବର୍ ଟଗଲ୍ କରନ୍ତୁ (ରାଇଟ୍-କ୍ଲିକ୍ କିମ୍ବା 2-ଆଙ୍ଗୁଳି ଟଚ୍)।</li>
+                <li><strong>ବକେଟ୍ ଫିଲ୍:</strong> ଅଞ୍ଚଳକୁ ଚୟନିତ ରଙ୍ଗରେ ଭରନ୍ତୁ।</li>
+                <li><strong>ଲକ୍ ଭ୍ୟୁ:</strong> ଚିତ୍ରକଳା ଲକ୍ କରନ୍ତୁ (5-ଆଙ୍ଗୁଳି ଟଚ୍ ଟଗଲ୍)।</li>
+                <li><strong>ରିସେଟ୍ ପଜ୍:</strong> କ୍ୟାନ୍ଭାସ୍ ଅବସ୍ଥାନ ରିସେଟ୍ କରନ୍ତୁ।</li>
+                <li><strong>ନୂଆ ପୃଷ୍ଠା:</strong> ନୂଆ ଚିତ୍ରକଳା ପୃଷ୍ଠା ଯୋଡ଼ନ୍ତୁ।</li>
+                <li><strong>ପୃଷ୍ଠା ସଫା:</strong> ବର୍ତ୍ତମାନର ପୃଷ୍ଠା ସଫା କରନ୍ତୁ (ଖାଲି ପୃଷ୍ଠା ହରାନ୍ତୁ)।</li>
+                <li><strong>ପୂର୍ବବର୍ତ୍ତୀ/ପୁନର୍ବାର:</strong> ଚିତ୍ରକଳା କାର୍ଯ୍ୟକୁ ପୂର୍ବବର୍ତ୍ତୀ/ପୁନରାବୃତ୍ତି କରନ୍ତୁ।</li>
+                <li><strong>JPG ସଂରକ୍ଷଣ:</strong> ବର୍ତ୍ତମାନର ପୃଷ୍ଠାକୁ JPG ଆକାରରେ ନିର୍ଯ୍ୟାସ କରନ୍ତୁ।</li>
+                <li><strong>PDF ସେୟାର୍:</strong> ସବୁ ପୃଷ୍ଠାକୁ PDF ଆକାରରେ ନିର୍ଯ୍ୟାସ କରନ୍ତୁ।</li>
+                <li><strong>ପେନ୍ ବେହଦ:</strong> ଲାଇନ୍ ଗଭୀରତା ଚୟନ କରନ୍ତୁ।</li>
+                <li><strong>ପେନ୍ ରଙ୍ଗ:</strong> ଡ୍ରପ୍ଡାଉନ୍ କିମ୍ବା ପିକର୍ରୁ ରଙ୍ଗ ଚୟନ କରନ୍ତୁ।</li>
+                <li><strong>ପୃଷ୍ଠା ନିୟନ୍ତ୍ରଣ:</strong> ପୃଷ୍ଠା ନେଭିଗେଟ୍ କରନ୍ତୁ (ଲକ୍ ମୋଡ୍ରେ ସ୍ୱାଇପ୍)।</li>
+                <li><strong>ମଲ୍ଟି-ଟଚ୍:</strong> 1-ଆଙ୍ଗୁଳି: ଡ୍ରଅ; 2-ଆଙ୍ଗୁଳି: ମାରିବା; 3-ଆଙ୍ଗୁଳି: ପୂର୍ବବର୍ତ୍ତୀ; 4-ଆଙ୍ଗୁଳି: ରାଣ୍ଡମ୍ ରଙ୍ଗ।</li>
+            </ul>
+            <h3>ସାଧାରଣ</h3>
+            <ul>
+                <li>ଟ୍ୟାବ୍ ସ୍ୱିଚ୍ କରି ପାଠ ଓ ଚିତ୍ରକଳା ମଧ୍ୟରେ ବଦଳାନ୍ତୁ।</li>
+                <li>ସକ୍ରିୟ ଟ୍ୟାବ୍ରେ ପୁନର୍ବାର ଟ୍ୟାପ୍ କରି ଅଂଶଗୁଡ଼ିକୁ ସଙ୍କୁଚିତ କରନ୍ତୁ।</li>
+                <li>ଡାଟା ସ୍ୱୟଂଚାଳିତ ଭାବେ ବ୍ରାଉଜର୍ ଷ୍ଟୋରେଜ୍ରେ ସଂରକ୍ଷିତ ହୁଏ।</li>
+            </ul>
+        </div>
+    </div>
+</div>
+
 <script>
     // Session Storage for Drawings (temporary, cleared on reload)
     let sessionCanvasPages = {};
@@ -454,9 +752,29 @@
         window.open('upi://pay?pa=9348692218-3@ibl&pn=ABHAYA%20%20BEHERA&mc=0000&mode=02&purpose=00');
     }
 
-    // Guide function
-    function openGuide() {
-        window.open('https://abhayattcc.github.io/Notepadguide/');
+    // Guide functions
+    function showGuide() {
+        document.getElementById('guideModal').style.display = 'block';
+        switchLang('en');
+    }
+
+    function closeGuide() {
+        document.getElementById('guideModal').style.display = 'none';
+    }
+
+    function switchLang(lang) {
+        document.querySelectorAll('.lang-tab').forEach(tab => tab.classList.remove('active'));
+        event.target.classList.add('active');
+        document.querySelectorAll('.guide-section').forEach(sec => sec.classList.remove('active'));
+        document.getElementById(`guide-${lang}`).classList.add('active');
+    }
+
+    // Close popup on outside click
+    window.onclick = function(event) {
+        const modal = document.getElementById('guideModal');
+        if (event.target == modal) {
+            closeGuide();
+        }
     }
 
     // IndexedDB Setup
