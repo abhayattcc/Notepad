@@ -2362,72 +2362,80 @@
         }
     }
 
-    function fillBucket(e) {
-        overlayContext.globalAlpha = 1;
-        const point = getCoordinates(e);
-        const x = Math.floor(point.x);
-        const y = Math.floor(point.y);
-        if (x < 0 || x >= overlayCanvas.width || y < 0 || y >= overlayCanvas.height) return;
-        const imageData = overlayContext.getImageData(0, 0, overlayCanvas.width, overlayCanvas.height);
-        const data = imageData.data;
-        const pos = (y * overlayCanvas.width + x) * 4;
-        const targetR = data[pos];
-        const targetG = data[pos + 1];
-        const targetB = data[pos + 2];
-        const targetA = data[pos + 3];
+function fillBucket(e) {
+    const point = getCoordinates(e);
+    const x = Math.floor(point.x);
+    const y = Math.floor(point.y);
 
-        const alphaThreshold = 50;
-        const colorTolerance = 30;
-        const stack = [[x, y]];
-        const visited = new Set();
-        const key = (xx, yy) => `${xx},${yy}`;
-        visited.add(key(x, y));
-        const r = parseInt(penColor.slice(1, 3), 16);
-        const g = parseInt(penColor.slice(3, 5), 16);
-        const b = parseInt(penColor.slice(5, 7), 16);
-        while (stack.length > 0) {
-            const [cx, cy] = stack.pop();
-            const idx = (cy * overlayCanvas.width + cx) * 4;
-            data[idx] = r;
-            data[idx + 1] = g;
-            data[idx + 2] = b;
-            data[idx + 3] = 255;
-            const dirs = [[0, 1], [1, 0], [0, -1], [-1, 0]];
-            for (let [dx, dy] of dirs) {
-                const nx = cx + dx;
-                const ny = cy + dy;
-                if (nx >= 0 && nx < overlayCanvas.width && ny >= 0 && ny < overlayCanvas.height) {
-                    const nkey = key(nx, ny);
-                    if (!visited.has(nkey)) {
-                        const nidx = (ny * overlayCanvas.width + nx) * 4;
-                        const nr = data[nidx];
-                        const ng = data[nidx + 1];
-                        const nb = data[nidx + 2];
-                        const na = data[nidx + 3];
-                        let shouldFill = false;
-                        if (targetA < alphaThreshold) {
-                            if (na < alphaThreshold) {
-                                shouldFill = true;
-                            }
-                        } else {
-                            if (na >= alphaThreshold &&
-                                Math.abs(nr - targetR) < colorTolerance &&
-                                Math.abs(ng - targetG) < colorTolerance &&
-                                Math.abs(nb - targetB) < colorTolerance) {
-                                shouldFill = true;
-                            }
-                        }
-                        if (shouldFill) {
-                            stack.push([nx, ny]);
-                            visited.add(nkey);
-                        }
-                    }
-                }
-            }
+    if (x < 0 || x >= overlayCanvas.width || y < 0 || y >= overlayCanvas.height) return;
+
+    const imageData = overlayContext.getImageData(0, 0, overlayCanvas.width, overlayCanvas.height);
+    const data = imageData.data;
+
+    const targetPos = (y * overlayCanvas.width + x) * 4;
+    let targetR = data[targetPos];
+    let targetG = data[targetPos + 1];
+    let targetB = data[targetPos + 2];
+    let targetA = data[targetPos + 3];
+
+    // If clicking on a fully opaque pixel (already filled or drawn on), do nothing
+    if (targetA > 200) return;
+
+    // If clicking on nearly the fill color, don't fill
+    const fillR = parseInt(penColor.slice(1, 3), 16);
+    const fillG = parseInt(penColor.slice(3, 5), 16);
+    const fillB = parseInt(penColor.slice(5, 7), 16);
+
+    const colorDiff = Math.max(
+        Math.abs(targetR - fillR),
+        Math.abs(targetG - fillG),
+        Math.abs(targetB - fillB)
+    );
+    if (colorDiff < 40 && targetA > 50) return;
+
+    // Use higher tolerance only for similar colors, but strict boundary detection
+    const tolerance = 35;
+    const stack = [[x, y]];
+    const visited = new Uint8Array(overlayCanvas.width * overlayCanvas.height); // Faster than Set
+
+    while (stack.length > 0) {
+        const [cx, cy] = stack.pop();
+        const idx = cy * overlayCanvas.width + cx;
+
+        if (visited[idx]) continue;
+        visited[idx] = 1;
+
+        const pos = idx * 4;
+        const r = data[pos];
+        const g = data[pos + 1];
+        const b = data[pos + 2];
+        const a = data[pos + 3];
+
+        // Stop at strong edges (high alpha or very different color)
+        if (a > 180) continue; // Strong drawn pixel - boundary
+        if (Math.abs(r - fillR) < 20 && Math.abs(g - fillG) < 20 && Math.abs(b - fillB) < 20 && a > 100) continue;
+
+        // Only fill if similar to target color OR mostly transparent
+        const isSimilar = Math.max(Math.abs(r - targetR), Math.abs(g - targetG), Math.abs(b - targetB)) <= tolerance;
+        const isTransparent = a < 80;
+
+        if (isSimilar || isTransparent) {
+            data[pos] = fillR;
+            data[pos + 1] = fillG;
+            data[pos + 2] = fillB;
+            data[pos + 3] = 255;
+
+            // Add neighbors
+            if (cx > 0) stack.push([cx - 1, cy]);
+            if (cx < overlayCanvas.width - 1) stack.push([cx + 1, cy]);
+            if (cy > 0) stack.push([cx, cy - 1]);
+            if (cy < overlayCanvas.height - 1) stack.push([cx, cy + 1]);
         }
-        overlayContext.putImageData(imageData, 0, 0);
-        saveCanvasState();
     }
+
+    overlayContext.putImageData(imageData, 0, 0);
+    saveCanvasState();
+}
 
     function eraseStroke(x, y) {
         overlayContext.globalAlpha = 1;
